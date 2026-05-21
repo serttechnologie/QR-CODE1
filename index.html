@@ -62,11 +62,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .crop-container { flex: 1; position: relative; overflow: hidden; }
 .crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
 
-/* ── Live QR Scanner Modal ── */
+/* ── Live QR Scanner Modal avec contrôles de taille ── */
 #scanner-modal { position: fixed; inset: 0; background: #000; z-index: 1500; display: none; flex-direction: column; }
 .scanner-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
 #camera-preview { width: 100%; height: 100%; object-fit: cover; }
-.scanner-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
+.scanner-controls { padding: 15px 20px; background: var(--paper); display: flex; flex-direction: column; gap: 12px; border-top: 2px solid var(--ink); }
+.scanner-slider-group { display: flex; flex-direction: column; gap: 4px; }
+.scanner-slider-header { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.75rem; color: var(--mid); font-weight: bold; }
+.scanner-slider { width: 100%; height: 8px; background: var(--border); border-radius: 4px; outline: none; -webkit-appearance: none; appearance: none; }
+.scanner-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--ink); }
 
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 15px; }
 
@@ -199,7 +203,14 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
     <div id="camera-preview"></div>
   </div>
   <div class="scanner-controls">
-    <button onclick="stopLiveScanner()" style="flex:1; padding:15px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700; cursor:pointer;">Annuler</button>
+    <div class="scanner-slider-group">
+      <div class="scanner-slider-header">
+        <span>Taille du viseur :</span>
+        <span id="scanner-size-val">40%</span>
+      </div>
+      <input type="range" id="scanner-size-slider" class="scanner-slider" min="15" max="85" value="40" oninput="updateScannerSize(this.value)">
+    </div>
+    <button onclick="stopLiveScanner()" style="padding:14px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700; cursor:pointer; width:100%;">Annuler</button>
   </div>
 </div>
 
@@ -321,18 +332,18 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
 let cropper;
 let liveScannerInstance = null;
+let currentScannerSizePercent = 40; // Taille initiale (40% de l'écran)
 let focusImgSrc = '';
 let focusIdx = 0;
 let currentFilter = 'all';
 let isEditMode = false;
 let isFocusEditing = false;
-let currentFolderId = null; // null = racine de l'application
+let currentFolderId = null; 
 const STORAGE_LIMIT_KB = 3500;
 
 let dragSrcIdx = null;
 let dragOverIdx = null;
 
-// Initialisation et mise en conformité des anciennes données
 items.forEach(item => {
   if (item.type === undefined) item.type = 'qr';
   if (item.folderId === undefined) item.folderId = null;
@@ -367,7 +378,7 @@ function createNewFolder() {
     id: Date.now(),
     type: 'folder',
     title: name.trim(),
-    folderId: null, // Les dossiers sont toujours à la racine pour simplifier la structure
+    folderId: null, 
     fav: false
   });
   
@@ -405,7 +416,7 @@ function updateFolderSelects() {
   selectCreate.innerHTML = html;
 }
 
-// ─── Drag & Drop Modifié pour support Dossiers ──────────────────────────────
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
 function addDragEvents(card, realIdx) {
   const handle = card.querySelector('.drag-handle');
   if (!handle) return;
@@ -428,13 +439,11 @@ function addDragEvents(card, realIdx) {
       const targetItem = items[dragOverIdx];
       const srcItem = items[dragSrcIdx];
       
-      // Si on glisse un QR sur un DOSSIER
       if (srcItem.type === 'qr' && targetItem && targetItem.type === 'folder') {
         srcItem.folderId = targetItem.id;
         saveItems();
         showToast(`✓ Déplacé dans "${targetItem.title}"`);
       } else {
-        // Réorganisation classique d'index
         reorder(dragSrcIdx, dragOverIdx);
       }
     }
@@ -461,7 +470,7 @@ function addDragEvents(card, realIdx) {
 
   card.addEventListener('dragleave', () => card.classList.remove('drag-over', 'folder-drop-hover'));
 
-  // Version Tactile mobile
+  // Tactile mobile
   let touchStartX, touchStartY, touchClone, touchMoved = false;
 
   handle.addEventListener('touchstart', (e) => {
@@ -543,7 +552,7 @@ function reorder(fromIdx, toIdx) {
   saveItems();
 }
 
-// ─── Navigation Basique ─────────────────────────────────────────────────────
+// ─── Navigation ─────────────────────────────────────────────────────────────
 function switchView(v, btn) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
@@ -568,16 +577,12 @@ function getFilteredItems() {
   return items
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => {
-      // Filtrage par favoris
       const matchFilter = currentFilter === 'fav' ? item.fav : true;
-      // Filtrage par barre de recherche
       const matchSearch = query ? item.title.toLowerCase().includes(query) : true;
       
       if (query || currentFilter === 'fav') {
-        // Hors structure de dossier si recherche active ou vue favoris globale
         return matchFilter && matchSearch && item.type === 'qr';
       } else {
-        // Comportement standard : respect des dossiers
         return item.folderId === currentFolderId;
       }
     });
@@ -676,18 +681,20 @@ function closeCrop() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 
-// ─── Scanner de QR en direct (Caméra) ─────────────────────────────────────────
+// ─── Scanner de QR en direct (Dynamique & Précis) ────────────────────────────
 function startLiveScanner() {
   document.getElementById('scanner-modal').style.display = 'flex';
   
-  // Initialisation de Html5Qrcode sur la div de preview
+  // Remettre la valeur initiale dans le curseur de contrôle
+  currentScannerSizePercent = 40;
+  document.getElementById('scanner-size-slider').value = currentScannerSizePercent;
+  document.getElementById('scanner-size-val').innerText = currentScannerSizePercent + "%";
+  
   liveScannerInstance = new Html5Qrcode("camera-preview");
   
   const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-    // Si un QR code est trouvé
     document.getElementById('in-text').value = decodedText;
     
-    // Essayer de deviner un titre automatique si c'est une URL
     if(decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
       try {
         const urlObj = new URL(decodedText);
@@ -703,18 +710,33 @@ function startLiveScanner() {
     stopLiveScanner();
   };
   
-  const config = { fps: 10, qrbox: (width, height) => {
-    const minSize = Math.min(width, height);
-    return { width: Math.round(minSize * 0.7), height: Math.round(minSize * 0.7) };
-  }};
+  // Fonction de calcul de la zone de visée dynamique selon le curseur
+  const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
+    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+    // Convertit le pourcentage choisi par l'utilisateur en pixels de visée
+    const size = Math.round(minEdge * (currentScannerSizePercent / 100));
+    return { width: size, height: size };
+  };
   
-  // Lance la caméra arrière par défaut
+  const config = { fps: 12, qrbox: qrboxFunction };
+  
   liveScannerInstance.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
     .catch(err => {
       console.error("Erreur de caméra: ", err);
       showToast("⚠ Impossible d'accéder à la caméra");
       stopLiveScanner();
     });
+}
+
+// Permet de rafraîchir en direct le cadre de visée sans couper la caméra
+function updateScannerSize(newVal) {
+  currentScannerSizePercent = parseInt(newVal);
+  document.getElementById('scanner-size-val').innerText = currentScannerSizePercent + "%";
+  
+  // Si le scanner tourne, on lui applique dynamiquement le nouveau cadre
+  if (liveScannerInstance && liveScannerInstance.isScanning) {
+    liveScannerInstance.applyVideoConstraints({}).catch(() => {});
+  }
 }
 
 function stopLiveScanner() {
@@ -724,7 +746,7 @@ function stopLiveScanner() {
       liveScannerInstance.clear();
       liveScannerInstance = null;
     }).catch(err => {
-      console.error("Erreur à l'arrêt du scanner: ", err);
+      console.error("Erreur à l'arrêt: ", err);
       liveScannerInstance = null;
     });
   }
@@ -928,7 +950,6 @@ function enableFocusEditMode() {
   document.getElementById('edit-focus-title').value = item.title;
   document.getElementById('edit-focus-text').value = item.text || "";
 
-  // Charger la liste des dossiers pour le sélecteur
   const selectEdit = document.getElementById('edit-focus-folder');
   let html = '<option value="">(Racine de la galerie)</option>';
   items.forEach(i => {
@@ -1093,7 +1114,6 @@ async function syncDrive() {
     const onlyOnDrive = driveItems.filter(i => !localIds.has(i.id));
     const onlyOnLocal = items.filter(i => !driveIds.has(i.id));
     
-    // Normaliser les types lors de la synchro au cas où
     onlyOnDrive.forEach(i => {
       if(i.type === undefined) i.type = 'qr';
       if(i.folderId === undefined) i.folderId = null;
@@ -1181,16 +1201,13 @@ async function confirmDelete(optionPlus) {
   
   if (target.type === 'folder') {
     if (optionPlus) {
-      // Supprime le dossier + les enfants rangeant dedans
       items = items.filter(i => i.folderId !== target.id);
     } else {
-      // Supprime juste le dossier, remet les enfants à la racine
       items.forEach(i => { if(i.folderId === target.id) i.folderId = null; });
     }
     items.splice(idx, 1);
     showToast('✓ Dossier supprimé');
   } else {
-    // QR classique
     if (optionPlus && driveToken) {
       try {
         if (!driveFileId) driveFileId = await findDriveFile();
@@ -1232,7 +1249,6 @@ function downloadFocus() {
   a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
 }
 
-// Lancement global
 updateCount();
 updateFolderSelects();
 </script>
