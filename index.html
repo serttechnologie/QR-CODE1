@@ -61,7 +61,7 @@ input:focus, textarea:focus { border-color: var(--accent); }
 .crop-container { flex: 1; position: relative; overflow: hidden; }
 .crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
 
-/* ── Galerie : Grille sur Bureau / Liste sur Mobile ── */
+/* ── Galerie ── */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -95,7 +95,6 @@ body.mode-edit .del-btn { display: flex; }
 body.mode-edit .drag-handle { display: flex; }
 body.mode-edit .fav-btn { display: none; }
 
-/* Drag & Drop visuels */
 .qr-card.dragging { opacity: 0.4; transform: scale(0.96); border-color: var(--accent); box-shadow: none; }
 .qr-card.drag-over { border-color: var(--accent); border-style: dashed; transform: scale(1.02); }
 .drag-clone { position: fixed; pointer-events: none; z-index: 9999; opacity: 0.9; transform: scale(1.04); box-shadow: 0 16px 36px rgba(26, 24, 20, 0.25); border-color: var(--accent) !important; background: var(--paper); border-radius: 12px; display: flex !important; flex-direction: row !important; align-items: center !important; text-align: left !important; }
@@ -130,12 +129,15 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 .nav-btn { background: var(--paper); border: 2px solid var(--ink); border-radius: 50%; width: 50px; height: 50px; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 .nav-btn:hover { background: var(--ink); color: var(--paper); }
 .nav-btn:disabled { opacity: 0.2; cursor: default; box-shadow: none; }
-.focus-top-bar { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; }
+.focus-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
 .nav-counter { font-family: var(--mono); font-size: 0.75rem; color: var(--mid); }
 .focus-fav-btn { background: none; border: 1.5px solid var(--border); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 
 /* Zone de décodage dans la modale Focus */
 .decoded-box { width: 100%; background: var(--bg); border: 1.5px dashed var(--mid); border-radius: 10px; padding: 12px; font-family: var(--mono); font-size: 0.8rem; word-break: break-all; max-height: 120px; overflow-y: auto; text-align: left; display: none; }
+
+/* Zone d'édition dans Focus */
+.edit-fields-container { display: none; flex-direction: column; gap: 10px; width: 100%; text-align: left; }
 
 #temp-qr { position: absolute; left: -9999px; }
 .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:white; padding:10px 20px; border-radius:50px; font-size:0.75rem; z-index:3000; opacity:0; transition:0.3s; pointer-events:none; white-space: nowrap; }
@@ -150,10 +152,10 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 .del-btn-local { background:var(--ink); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
 .del-btn-cancel { background:none; color:var(--mid); border:1.5px solid var(--border); border-radius:10px; padding:11px; font-family:var(--sans); font-size:0.85rem; cursor:pointer; }
 
-/* ── OPTIMISATION MOBILE : 1 seul QR par ligne (Style liste premium) ── */
+/* Mobile : 1 seul QR par ligne */
 @media (max-width: 600px) {
   .gallery-grid {
-    grid-template-columns: 1fr; /* Force une seule ligne */
+    grid-template-columns: 1fr;
     gap: 10px;
     padding: 10px;
   }
@@ -172,7 +174,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
     flex-shrink: 0;
   }
   .qr-card p {
-    font-size: 0.95rem; /* Titre plus lisible sur mobile */
+    font-size: 0.95rem;
     flex: 1;
     white-space: normal;
     display: -webkit-box;
@@ -188,7 +190,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
   .drag-handle {
     position: static;
     order: 4;
-    display: none; /* Géré par le CSS .mode-edit */
+    display: none;
     flex-shrink: 0;
   }
   body.mode-edit .drag-handle {
@@ -293,16 +295,33 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
       <span class="nav-counter" id="nav-counter">1 / 1</span>
       <button class="focus-fav-btn" id="focus-fav-btn" onclick="toggleFocusFav()" title="Favori">☆</button>
     </div>
+    
     <h2 id="focus-title" style="font-size:1.3rem; font-weight:800; text-align:center;"></h2>
+    <div id="focus-qr-display" style="background:white; padding:10px; border-radius:10px; display: flex; justify-content: center; width:100%;"></div>
     
-    <div id="focus-qr-display" style="background:white; padding:10px; border-radius:10px; display: flex; justify-content: center;"></div>
-    
+    <div class="edit-fields-container" id="focus-edit-container">
+      <div class="field-group" style="margin-bottom:8px;">
+        <label style="font-size:0.75rem;">Modifier le Titre</label>
+        <input type="text" id="edit-focus-title" style="padding:10px; font-size:14px; border-radius:8px;">
+      </div>
+      <div class="field-group">
+        <label style="font-size:0.75rem;">Modifier le Contenu (Lien, MDP...)</label>
+        <textarea id="edit-focus-text" rows="3" style="padding:10px; font-size:14px; border-radius:8px; font-family:var(--mono);"></textarea>
+      </div>
+    </div>
+
     <div class="decoded-box" id="focus-decoded-box"></div>
 
-    <div class="focus-actions">
-      <button class="btn-main" style="background: var(--accent);" onclick="scanCurrentFocusQR()">🔍 Décoder / Lire</button>
+    <div class="focus-actions" id="focus-normal-actions">
+      <button class="btn-main" style="background: var(--accent);" id="btn-decode" onclick="scanCurrentFocusQR()">🔍 Décoder / Lire</button>
+      <button class="btn-main" style="background: #2b6cb0; color: white;" id="btn-trigger-edit" onclick="enableFocusEditMode()">✏ Modifier le contenu</button>
       <button class="btn-main" onclick="downloadFocus()">⬇ Télécharger</button>
       <button class="btn-main" style="background:var(--mid);" onclick="closeFocus()">Fermer</button>
+    </div>
+
+    <div class="focus-actions" id="focus-edit-actions" style="display:none;">
+      <button class="btn-main" style="background: #2f855a; color: white;" onclick="saveFocusModifications()">💾 Enregistrer les modifications</button>
+      <button class="btn-main" style="background:var(--mid);" onclick="cancelFocusEditMode()">Annuler</button>
     </div>
   </div>
 </div>
@@ -310,13 +329,14 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 <div id="toast" class="toast"></div>
 
 <script>
-// ─── État global ────────────────────────────────────────────────────────────
+// ─── État global (Utilise la clé qr_items_v1 pour conserver vos données existantes) ────────────────
 let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
 let cropper;
 let focusImgSrc = '';
 let focusIdx = 0;
 let currentFilter = 'all';
 let isEditMode = false;
+let isFocusEditing = false;
 const STORAGE_LIMIT_KB = 3500;
 
 function toggleEditMode() {
@@ -339,15 +359,11 @@ function initDragHint() {
   if (hint) hint.classList.toggle('visible', items.length >= 2 && isEditMode);
 }
 
-// ─── Drag & Drop (Handle + Scroll Mobile sauf sur poignée) ───────────────────
-let dragSrcIdx = null;
-let dragOverIdx = null;
-
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
 function addDragEvents(card, realIdx) {
   const handle = card.querySelector('.drag-handle');
   if (!handle) return;
 
-  // Desktop
   handle.addEventListener('mousedown', () => { card.setAttribute('draggable', 'true'); });
   handle.addEventListener('mouseup', () => { card.removeAttribute('draggable'); });
 
@@ -380,7 +396,6 @@ function addDragEvents(card, realIdx) {
   card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
   card.addEventListener('drop', (e) => e.preventDefault());
 
-  // Mobile Tactile (Ne s'active QUE sur la poignée, permettant le scroll partout ailleurs)
   let touchStartX, touchStartY, touchClone, touchMoved = false;
 
   handle.addEventListener('touchstart', (e) => {
@@ -402,7 +417,7 @@ function addDragEvents(card, realIdx) {
   handle.addEventListener('touchmove', (e) => {
     if (dragSrcIdx === null || !touchClone) return;
     touchMoved = true;
-    if(e.cancelable) e.preventDefault(); // Bloque le scroll uniquement pendant le drag
+    if(e.cancelable) e.preventDefault();
 
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartX;
@@ -590,7 +605,7 @@ function waitForQRCanvas(container, callback, attempts = 0) {
 
 function saveItems() {
   try { localStorage.setItem('qr_items_v1', JSON.stringify(items)); }
-  catch(e) { showToast('⚠ Stockage insuffisant'); }
+  catch(e) { showToast('⚠ Stockage insuffisante'); }
 }
 function getStorageUsageKB() {
   try { return Math.round(((localStorage.getItem('qr_items_v1') || '').length * 2) / 1024); }
@@ -655,13 +670,14 @@ function updateStorageBar() {
   document.getElementById('storage-label').innerText = `${usedKB} Ko / ${STORAGE_LIMIT_KB} Ko`;
 }
 
-// ─── Mode Focus & Scanner de QR Code Intégré ─────────────────────────────────
+// ─── Mode Focus, Lecteur Intégré & Modification Réversible ────────────────────
 function openFocus(idx) {
   const item = items[idx];
   if (!item) return;
   focusIdx = idx;
   
-  // Reset de la boîte de décodage interne à chaque ouverture
+  cancelFocusEditMode(); // S'assure de démarrer en mode lecture pure
+
   const box = document.getElementById('focus-decoded-box');
   box.style.display = "none";
   box.innerText = "";
@@ -676,31 +692,30 @@ function renderFocus() {
   const item = items[focusIdx];
   if (!item) return;
   focusImgSrc = item.img;
+  
   document.getElementById('focus-title').innerText = item.title;
   document.getElementById('focus-qr-display').innerHTML = `<img id="focus-qr-img" src="${item.img}" style="width:220px; max-width:100%; display:block;">`;
+  
   const total = filtered.length || items.length;
   const pos = posInFiltered >= 0 ? posInFiltered + 1 : '?';
   document.getElementById('nav-counter').innerText = `${pos} / ${total}`;
-  document.getElementById('nav-prev').disabled = posInFiltered <= 0;
-  document.getElementById('nav-next').disabled = posInFiltered >= filtered.length - 1;
+  document.getElementById('nav-prev').disabled = posInFiltered <= 0 || isFocusEditing;
+  document.getElementById('nav-next').disabled = posInFiltered >= filtered.length - 1 || isFocusEditing;
   document.getElementById('focus-fav-btn').innerText = item.fav ? '⭐' : '☆';
 }
 
-// Nouvelle fonction pour Scanner/Décoder le QR affiché sur l'écran sans caméra externe
 function scanCurrentFocusQR() {
   const imgElement = document.getElementById('focus-qr-img');
   const box = document.getElementById('focus-decoded-box');
   if (!imgElement) return;
 
-  const html5QrCode = new Html5Qrcode("temp-qr"); // Utilise la div fantôme en arrière-plan
+  const html5QrCode = new Html5Qrcode("temp-qr");
   
-  // On transforme l'image Base64 en objet File exploitable par le décodeur
   fetch(imgElement.src)
     .then(res => res.blob())
     .then(blob => {
       const file = new File([blob], "qr_image.png", { type: "image/png" });
       
-      // Lancement du scan d'image local
       html5QrCode.scanFile(file, true)
         .then(decodedText => {
           box.innerText = "Contenu détecté :\n" + decodedText;
@@ -710,7 +725,6 @@ function scanCurrentFocusQR() {
           showToast("✓ QR Code scanné avec succès !");
         })
         .catch(err => {
-          // Si le scan automatique échoue, on affiche la variable texte de secours sauvegardée
           const backupText = items[focusIdx] ? items[focusIdx].text : "";
           if (backupText) {
             box.innerText = "Contenu (Secours Local) :\n" + backupText;
@@ -722,14 +736,80 @@ function scanCurrentFocusQR() {
     });
 }
 
+/* Fonctions associées à la modification du QR Code */
+function enableFocusEditMode() {
+  isFocusEditing = true;
+  const item = items[focusIdx];
+  if(!item) return;
+
+  // Masquer les flèches de navigation latérales
+  document.getElementById('nav-prev').disabled = true;
+  document.getElementById('nav-next').disabled = true;
+
+  // Remplir les champs d'édition
+  document.getElementById('edit-focus-title').value = item.title;
+  document.getElementById('edit-focus-text').value = item.text || "";
+
+  // Basculer l'affichage
+  document.getElementById('focus-title').style.display = "none";
+  document.getElementById('focus-qr-display').style.display = "none";
+  document.getElementById('focus-decoded-box').style.display = "none";
+  
+  document.getElementById('focus-edit-container').style.display = "flex";
+  document.getElementById('focus-normal-actions').style.display = "none";
+  document.getElementById('focus-edit-actions').style.display = "flex";
+}
+
+function cancelFocusEditMode() {
+  isFocusEditing = false;
+  
+  document.getElementById('focus-title').style.display = "block";
+  document.getElementById('focus-qr-display').style.display = "flex";
+  
+  document.getElementById('focus-edit-container').style.display = "none";
+  document.getElementById('focus-normal-actions').style.display = "flex";
+  document.getElementById('focus-edit-actions').style.display = "none";
+  
+  renderFocus();
+}
+
+function saveFocusModifications() {
+  const newTitle = document.getElementById('edit-focus-title').value.trim();
+  const newText = document.getElementById('edit-focus-text').value.trim();
+
+  if(!newTitle || !newText) {
+    return showToast("Le titre et le contenu ne peuvent pas être vides");
+  }
+
+  // Régénération immédiate du QR Code en arrière plan
+  const tempArea = document.getElementById('temp-qr');
+  tempArea.innerHTML = '';
+  new QRCode(tempArea, { text: newText, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
+  
+  waitForQRCanvas(tempArea, (finalImg) => {
+    // Écrasement des anciennes valeurs sans dupliquer la carte
+    items[focusIdx].title = newTitle;
+    items[focusIdx].text = newText;
+    items[focusIdx].img = finalImg;
+    
+    saveItems();
+    showToast("✓ Modifications enregistrées !");
+    
+    // Sortie automatique du mode édition
+    cancelFocusEditMode();
+    render();
+  });
+}
+
+// ... (Le reste des fonctions d'arrière-plan de l'application reste inchangé) ...
 function navigateFocus(dir) {
+  if (isFocusEditing) return;
   const filtered = getFilteredItems();
   const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
   const newPos = posInFiltered + dir;
   if (newPos < 0 || newPos >= filtered.length) return;
   focusIdx = filtered[newPos].idx;
   
-  // Reset de la boîte de texte scanné pour la carte suivante
   const box = document.getElementById('focus-decoded-box');
   box.style.display = "none";
   box.innerText = "";
