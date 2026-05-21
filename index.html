@@ -152,6 +152,18 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
   .drag-handle { position: static; order: 4; display: none; flex-shrink: 0; }
   body.mode-edit .drag-handle { display: flex; }
   .del-btn { top: -4px; left: -4px; right: auto; }
+  
+  /* Ajustements pour s'assurer que les boutons restent visibles sur petit écran */
+  .ocr-trigger {
+    align-self: center !important;
+    margin-bottom: 0 !important;
+    padding: 8px 14px !important;
+    font-size: 0.8rem !important;
+  }
+  .focus-card {
+    max-width: 95% !important;
+    padding: 20px 10px !important;
+  }
 }
 </style>
 </head>
@@ -296,18 +308,6 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 </div>
 
 <div id="toast" class="toast"></div>
-
-<div id="del-modal">
-  <div class="del-modal-box">
-    <h3 id="del-modal-title">Supprimer ?</h3>
-    <p id="del-modal-desc">Action irréversible</p>
-    <div class="del-modal-actions">
-      <button class="del-btn-drive" id="btn-del-everywhere" onclick="confirmDelete(true)">🗑 Tout supprimer</button>
-      <button class="del-btn-local" id="btn-del-local" onclick="confirmDelete(false)">Option secondaire</button>
-      <button class="del-btn-cancel" onclick="closeDeleteModal()">Annuler</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ─── État global ────────────────────────────────────────────────────────────
@@ -918,29 +918,6 @@ function saveFocusModifications() {
   });
 }
 
-function navigateFocus(dir) {
-  if (isFocusEditing) return;
-  const filtered = getFilteredItems().filter(f => f.item.type === 'qr');
-  const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
-  const newPos = posInFiltered + dir;
-  if (newPos < 0 || newPos >= filtered.length) return;
-  focusIdx = filtered[newPos].idx;
-  
-  document.getElementById('focus-decoded-box').style.display = "none";
-  renderFocus();
-}
-
-function toggleFocusFav() {
-  items[focusIdx].fav = !items[focusIdx].fav;
-  saveItems(); renderFocus(); render();
-}
-function closeFocus() { document.getElementById('focus-mode').style.display = 'none'; }
-function downloadFocus() {
-  if (!focusImgSrc) return;
-  const a = document.createElement('a');
-  a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
-}
-
 // ─── Cloud & Backup ─────────────────────────────────────────────────────────
 const DRIVE_CLIENT_ID = '510292526417-007bs9oh8tdif3hgkr4ov33ns7ctl5kq.apps.googleusercontent.com';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -1172,6 +1149,18 @@ function showToast(m) {
 updateCount();
 updateFolderSelects();
 </script>
+
+<div id="del-modal">
+  <div class="del-modal-box">
+    <h3 id="del-modal-title">Supprimer ?</h3>
+    <p id="del-modal-desc">Action irréversible</p>
+    <div class="del-modal-actions">
+      <button class="del-btn-drive" id="btn-del-everywhere" onclick="confirmDelete(true)">🗑 Tout supprimer</button>
+      <button class="del-btn-local" id="btn-del-local" onclick="confirmDelete(false)">Option secondaire</button>
+      <button class="del-btn-cancel" onclick="closeDeleteModal()">Annuler</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
