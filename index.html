@@ -10,13 +10,11 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <style>
 :root {
   --bg: #f0ede6; --paper: #fdfbf7; --ink: #1a1814; --mid: #8a8578;
   --accent: #d4621a; --border: #d8d3c8; --mono: 'DM Mono', monospace; --sans: 'Bricolage Grotesque', sans-serif;
-  --folder-color: #cca01a;
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
 body { background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh; display:flex; flex-direction:column; overflow-x: hidden; }
@@ -37,13 +35,14 @@ nav { display:flex; }
 .create-wrap { max-width:500px; margin:0 auto; padding:30px 20px; display:flex; flex-direction:column; gap:20px; }
 .field-group { display:flex; flex-direction:column; gap:6px; position: relative; }
 label { font-size:.8rem; font-weight:700; color:var(--mid); }
-input, textarea, select { font-family:var(--mono); font-size:16px; background:var(--paper); border:1.5px solid var(--border); border-radius:12px; padding:14px; width:100%; outline:none; transition: border-color 0.2s; }
+input, textarea, select { font-family:var(--mono); font-size:16px; background:var(--paper); border:1.5px solid var(--border); border-radius:12px; padding:14px; width:100%; outline:none; transition: border-color 0.2s; color: var(--ink); }
 input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 .btn-main { background:var(--ink); color:var(--paper); border:none; border-radius:14px; padding:18px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-family: var(--sans); font-size: 1rem; transition: opacity 0.2s; }
 .btn-main:active { opacity: 0.8; }
 .ocr-trigger { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; cursor: pointer; align-self: flex-end; margin-bottom: -5px; font-family: var(--sans); }
 
+/* OCR Progress */
 #ocr-loader { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 16px; }
 #ocr-steps { display: flex; flex-direction: column; gap: 8px; width: 260px; }
 .ocr-step { font-size: 0.75rem; font-family: var(--mono); color: #aaa; display: flex; align-items: center; gap: 8px; transition: color 0.3s; }
@@ -57,82 +56,124 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .ocr-bar-wrap { width: 260px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
 .ocr-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
 
+/* Modal crop */
 #crop-modal { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
 .crop-container { flex: 1; position: relative; overflow: hidden; }
 .crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
 
-.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 15px; }
+/* ── Galerie ── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  padding: 10px;
+}
 
-/* ── Cards ── */
-.qr-card { background: var(--paper); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px; position: relative; text-align: center; transition: border-color 0.2s, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s; user-select: none; -webkit-user-select: none; }
-.qr-card:not(.reordering) { cursor: pointer; }
-.qr-card:not(.reordering):hover { border-color: var(--ink); transform: translateY(-2px); }
-.qr-card img { width:100%; border-radius:6px; margin-bottom:8px; pointer-events: none; }
-.qr-card p { font-size:0.75rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* ── QR Card ── */
+.qr-card {
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 7px;
+  position: relative;
+  text-align: center;
+  cursor: grab;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.qr-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+.qr-card img { width:100%; border-radius:4px; margin-bottom:5px; pointer-events: none; }
+.del-btn { position: absolute; top: 4px; right: 4px; background: var(--ink); border: none; border-radius: 50%; width: 18px; height: 18px; color: white; font-size: 0.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; }
 
-/* Styles spécifiques Dossier */
-.qr-card.is-folder { border-left: 5px solid var(--folder-color); }
-.folder-icon-wrap { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin-bottom: 8px; color: var(--folder-color); background: var(--bg); border-radius: 6px; }
-.folder-count { font-family: var(--mono); font-size: 0.65rem; color: var(--mid); margin-top: 2px; }
+/* Menu dossier sur la carte */
+.folder-select-card {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  padding: 3px;
+  margin-top: 5px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  outline: none;
+  width: 100%;
+}
 
-.del-btn { position: absolute; top: -6px; right: -6px; background: #e53e3e; border: none; border-radius: 50%; width: 22px; height: 22px; color: white; font-size: 0.65rem; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 5; }
-.fav-btn { position: absolute; top: 4px; left: 5px; background: none; border: none; font-size: 1rem; cursor: pointer; opacity: 1; line-height: 1; padding: 0; z-index: 4; }
-.drag-handle { display: none; position: absolute; bottom: 8px; right: 8px; width: 24px; height: 24px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; color: var(--mid); align-items: center; justify-content: center; font-size: 0.75rem; cursor: grab; z-index: 4; touch-action: none; }
-.drag-handle:active { cursor: grabbing; background: var(--ink); color: var(--paper); border-color: var(--ink); }
+/* ── Drag & Drop états ── */
+.qr-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.96);
+  border-color: var(--accent);
+  cursor: grabbing;
+  box-shadow: none;
+}
+.qr-card.drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px rgba(212, 98, 26, 0.2);
+}
+/* Indicateur de mode réorganisation */
+.drag-hint {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--mid);
+  text-align: center;
+  padding: 4px 15px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.drag-hint.visible { opacity: 1; }
+.drag-handle-icon { font-size: 0.8rem; }
 
-body.mode-edit .del-btn { display: flex; }
-body.mode-edit .drag-handle { display: flex; }
-body.mode-edit .fav-btn { display: none; }
-
-.qr-card.dragging { opacity: 0.4; transform: scale(0.96); border-color: var(--accent); box-shadow: none; }
-.qr-card.drag-over { border-color: var(--accent); border-style: dashed; transform: scale(1.02); }
-.qr-card.folder-drop-hover { border-color: var(--folder-color) !important; background: #fffdf3; transform: scale(1.05); box-shadow: 0 4px 12px rgba(204,160,26,0.2); }
-.drag-clone { position: fixed; pointer-events: none; z-index: 9999; opacity: 0.9; transform: scale(1.04); box-shadow: 0 16px 36px rgba(26, 24, 20, 0.25); border-color: var(--accent) !important; background: var(--paper); border-radius: 12px; display: flex !important; flex-direction: row !important; align-items: center !important; text-align: left !important; }
-
-.drag-hint { font-family: var(--mono); font-size: 0.65rem; color: var(--accent); text-align: center; padding: 8px 15px 0; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0; max-height: 0; overflow: hidden; transition: all 0.3s ease; }
-body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
-
+/* Stockage warning */
 .storage-bar-wrap { margin: 0 15px 10px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
 .storage-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .storage-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s; }
 .storage-label { font-family: var(--mono); font-size: 0.65rem; color: var(--mid); white-space: nowrap; }
 
+/* Favoris */
+.fav-btn { position: absolute; top: 4px; left: 5px; background: none; border: none; font-size: 1rem; cursor: pointer; opacity: 1; line-height: 1; padding: 0; z-index: 10; }
+
+/* Galerie toolbar */
 .gallery-toolbar { padding: 10px 15px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .search-input { font-family: var(--mono); font-size: 0.8rem; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; flex: 1; min-width: 120px; outline: none; transition: border-color 0.2s; }
 .search-input:focus { border-color: var(--accent); }
 .filter-btn { font-family: var(--mono); font-size: 0.7rem; font-weight: 700; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--paper); color: var(--mid); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .filter-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.edit-toggle-btn { background: var(--paper); border: 1.5px solid var(--ink); color: var(--ink); }
-.edit-toggle-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
-.folder-path-bar { margin: 10px 15px 0; background: var(--paper); border: 1.5px dashed var(--border); border-radius: 10px; padding: 10px 14px; display: none; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.8rem; }
-.btn-back { background: var(--ink); color: var(--paper); border: none; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; cursor: pointer; font-weight: bold; }
-
+/* Import / Export */
 .io-toolbar { padding: 8px 15px 0; display: flex; gap: 8px; }
 .io-btn { font-family: var(--mono); font-size: 0.7rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--paper); color: var(--ink); cursor: pointer; transition: all 0.2s; flex: 1; text-align: center; }
 .io-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
 /* Focus overlay */
-.focus-overlay { position: fixed; inset:0; background: rgba(245, 242, 235, 0.98); backdrop-filter: blur(8px); z-index: 200; display: none; flex-direction: column; align-items:center; justify-content: center; padding: 20px; overflow-y: auto; }
-.focus-card { background: var(--paper); border: 2px solid var(--ink); border-radius: 24px; padding: 25px 15px; width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 16px; position: relative; margin: auto; }
-.focus-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.focus-nav-side { position: absolute; top: 40%; transform: translateY(-50%); z-index: 10; }
+.focus-overlay { position: fixed; inset:0; background: rgba(245, 242, 235, 0.98); backdrop-filter: blur(8px); z-index: 200; display: none; flex-direction: column; align-items:center; justify-content: center; padding: 20px; }
+.focus-card { background: var(--paper); border: 2px solid var(--ink); border-radius: 24px; padding: 30px 15px; width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 20px; position: relative; }
+.focus-actions { display: flex; gap: 10px; width: 100%; }
+.focus-nav-side { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; }
 .focus-nav-left { left: 16px; }
 .focus-nav-right { right: 16px; }
-.nav-btn { background: var(--paper); border: 2px solid var(--ink); border-radius: 50%; width: 50px; height: 50px; font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.nav-btn { background: var(--paper); border: 2px solid var(--ink); border-radius: 50%; width: 56px; height: 56px; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 .nav-btn:hover { background: var(--ink); color: var(--paper); }
 .nav-btn:disabled { opacity: 0.2; cursor: default; box-shadow: none; }
-.focus-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.focus-top-bar { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; }
 .nav-counter { font-family: var(--mono); font-size: 0.75rem; color: var(--mid); }
 .focus-fav-btn { background: none; border: 1.5px solid var(--border); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-
-.decoded-box { width: 100%; background: var(--bg); border: 1.5px dashed var(--mid); border-radius: 10px; padding: 12px; font-family: var(--mono); font-size: 0.8rem; word-break: break-all; max-height: 120px; overflow-y: auto; text-align: left; display: none; }
-.edit-fields-container { display: none; flex-direction: column; gap: 10px; width: 100%; text-align: left; }
+.focus-fav-btn:hover { border-color: var(--accent); }
 
 #temp-qr { position: absolute; left: -9999px; }
 .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:white; padding:10px 20px; border-radius:50px; font-size:0.75rem; z-index:3000; opacity:0; transition:0.3s; pointer-events:none; white-space: nowrap; }
 .toast.show { opacity:1; }
 
+/* ── Modal suppression ── */
 #del-modal { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:300; display:none; align-items:center; justify-content:center; }
 .del-modal-box { background:var(--paper); border:2px solid var(--ink); border-radius:20px; padding:28px 24px; max-width:340px; width:90%; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,0.18); }
 .del-modal-box h3 { font-size:1.1rem; font-weight:800; margin-bottom:8px; }
@@ -141,18 +182,6 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 .del-btn-drive { background:var(--accent); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
 .del-btn-local { background:var(--ink); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
 .del-btn-cancel { background:none; color:var(--mid); border:1.5px solid var(--border); border-radius:10px; padding:11px; font-family:var(--sans); font-size:0.85rem; cursor:pointer; }
-
-@media (max-width: 600px) {
-  .gallery-grid { grid-template-columns: 1fr; gap: 10px; padding: 10px; }
-  .qr-card { display: flex; flex-direction: row; align-items: center; text-align: left; padding: 12px 14px; gap: 16px; }
-  .qr-card img, .folder-icon-wrap { width: 64px; height: 64px; margin-bottom: 0; flex-shrink: 0; }
-  .folder-icon-wrap { font-size: 2rem; }
-  .qr-card p { font-size: 0.95rem; flex: 1; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .fav-btn { position: static; order: 3; font-size: 1.2rem; padding: 4px; }
-  .drag-handle { position: static; order: 4; display: none; flex-shrink: 0; }
-  body.mode-edit .drag-handle { display: flex; }
-  .del-btn { top: -4px; left: -4px; right: auto; }
-}
 </style>
 </head>
 <body>
@@ -183,7 +212,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
   <div class="crop-container"><img id="image-to-crop"></div>
   <div class="crop-controls">
     <button onclick="closeCrop()" style="flex:1; padding:15px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700;">Annuler</button>
-    <button class="btn-main" style="flex:2" onclick="processAndOCR()">Analyse la zone</button>
+    <button class="btn-main" style="flex:2" onclick="processAndOCR()">Analyser la zone</button>
   </div>
 </div>
 
@@ -197,10 +226,14 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
       <input type="text" id="in-title" placeholder="Ex: WiFi maison">
     </div>
     <div class="field-group">
-      <label>Dossier de destination</label>
+      <label>Dossier / Catégorie</label>
       <select id="in-folder">
-        <option value="">(Racine de la galerie)</option>
+        <option value="">Aucun dossier (Racine)</option>
       </select>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <input type="text" id="new-folder-name" placeholder="Nouveau nom de dossier..." style="padding:8px 12px; font-size:0.8rem;">
+        <button class="ocr-trigger" onclick="createNewFolder()" style="align-self:auto; margin-bottom:0; padding:0 15px;">+ Créer Dossier</button>
+      </div>
     </div>
     <div class="field-group">
       <div style="display:flex; justify-content:space-between; align-items:flex-end;">
@@ -222,20 +255,16 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
     <div class="storage-bar"><div class="storage-fill" id="storage-fill"></div></div>
     <span class="storage-label" id="storage-label">0%</span>
   </div>
-  
   <div class="gallery-toolbar">
-    <input class="search-input" type="text" id="search-input" placeholder="🔍 Rechercher…" oninput="render()">
+    <input class="search-input" type="text" id="search-input" placeholder="🔍 Rechercher par titre…" oninput="render()">
     <button class="filter-btn active" id="filter-all" onclick="setFilter('all', this)">Tous</button>
     <button class="filter-btn" id="filter-fav" onclick="setFilter('fav', this)">⭐ Favoris</button>
-    <button class="filter-btn" onclick="createNewFolder()">📁 + Dossier</button>
-    <button class="filter-btn edit-toggle-btn" id="edit-toggle" onclick="toggleEditMode()">Modifier</button>
+    <span style="font-family:var(--mono); font-size:0.7rem; color:var(--mid);">Dossier :</span>
+    <select id="filter-folder" onchange="render()" style="width:auto; padding:6px 12px; font-size:0.75rem; border-radius:10px;">
+      <option value="all">Tous les dossiers</option>
+      <option value="">Sans dossier</option>
+    </select>
   </div>
-
-  <div class="folder-path-bar" id="folder-path-bar">
-    <button class="btn-back" onclick="exitFolder()">← Retour</button>
-    <span id="folder-path-name" style="font-weight: bold; color: var(--ink);">Dossier</span>
-  </div>
-
   <div class="io-toolbar">
     <button class="io-btn" id="drive-btn" onclick="toggleDrive()" style="display:flex;align-items:center;justify-content:center;gap:6px">
       <span id="drive-dot" style="width:8px;height:8px;border-radius:50%;background:#aaa;flex-shrink:0;transition:background 0.3s"></span>
@@ -247,7 +276,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
     <input type="file" id="import-input" style="display:none" accept=".json" onchange="importJSON(event)">
   </div>
   <div class="drag-hint" id="drag-hint">
-    Mode réorganisation — Glisse via ☰ ou dépose sur un dossier pour ranger.
+    <span class="drag-handle-icon">⠿</span> Glisse les cartes pour réorganiser
   </div>
   <div id="display-grid" class="gallery-grid"></div>
 </main>
@@ -260,37 +289,11 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
       <span class="nav-counter" id="nav-counter">1 / 1</span>
       <button class="focus-fav-btn" id="focus-fav-btn" onclick="toggleFocusFav()" title="Favori">☆</button>
     </div>
-    
     <h2 id="focus-title" style="font-size:1.3rem; font-weight:800; text-align:center;"></h2>
-    <div id="focus-qr-display" style="background:white; padding:10px; border-radius:10px; display: flex; justify-content: center; width:100%;"></div>
-    
-    <div class="edit-fields-container" id="focus-edit-container">
-      <div class="field-group" style="margin-bottom:8px;">
-        <label style="font-size:0.75rem;">Modifier le Titre</label>
-        <input type="text" id="edit-focus-title" style="padding:10px; font-size:14px; border-radius:8px;">
-      </div>
-      <div class="field-group" style="margin-bottom:8px;">
-        <label style="font-size:0.75rem;">Dossier</label>
-        <select id="edit-focus-folder" style="padding:10px; font-size:14px; border-radius:8px;"></select>
-      </div>
-      <div class="field-group">
-        <label style="font-size:0.75rem;">Modifier le Contenu</label>
-        <textarea id="edit-focus-text" rows="3" style="padding:10px; font-size:14px; border-radius:8px; font-family:var(--mono);"></textarea>
-      </div>
-    </div>
-
-    <div class="decoded-box" id="focus-decoded-box"></div>
-
-    <div class="focus-actions" id="focus-normal-actions">
-      <button class="btn-main" style="background: var(--accent);" id="btn-decode" onclick="scanCurrentFocusQR()">🔍 Décoder / Lire</button>
-      <button class="btn-main" style="background: #2b6cb0; color: white;" id="btn-trigger-edit" onclick="enableFocusEditMode()">✏ Modifier le contenu</button>
-      <button class="btn-main" onclick="downloadFocus()">⬇ Télécharger</button>
-      <button class="btn-main" style="background:var(--mid);" onclick="closeFocus()">Fermer</button>
-    </div>
-
-    <div class="focus-actions" id="focus-edit-actions" style="display:none;">
-      <button class="btn-main" style="background: #2f855a; color: white;" onclick="saveFocusModifications()">💾 Enregistrer</button>
-      <button class="btn-main" style="background:var(--mid);" onclick="cancelFocusEditMode()">Annuler</button>
+    <div id="focus-qr-display" style="background:white; padding:10px; border-radius:10px;"></div>
+    <div class="focus-actions">
+      <button class="btn-main" style="flex:1; padding:14px;" onclick="downloadFocus()">⬇ Télécharger</button>
+      <button class="btn-main" style="flex:1; padding:14px; background:var(--mid);" onclick="closeFocus()">Fermer</button>
     </div>
   </div>
 </div>
@@ -300,220 +303,155 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 <script>
 // ─── État global ────────────────────────────────────────────────────────────
 let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
+let folders = JSON.parse(localStorage.getItem('qr_folders_v1') || '[]'); // Gestion des dossiers
 let cropper;
 let focusImgSrc = '';
 let focusIdx = 0;
 let currentFilter = 'all';
-let isEditMode = false;
-let isFocusEditing = false;
-let currentFolderId = null; // null = racine de l'application
 const STORAGE_LIMIT_KB = 3500;
 
-let dragSrcIdx = null;
-let dragOverIdx = null;
-
-// Initialisation et mise en conformité des anciennes données
-items.forEach(item => {
-  if (item.type === undefined) item.type = 'qr';
-  if (item.folderId === undefined) item.folderId = null;
-});
-
-function toggleEditMode() {
-  isEditMode = !isEditMode;
-  const btn = document.getElementById('edit-toggle');
-  if (isEditMode) {
-    document.body.classList.add('mode-edit');
-    btn.textContent = 'Terminé';
-    btn.classList.add('active');
-  } else {
-    document.body.classList.remove('mode-edit');
-    btn.textContent = 'Modifier';
-    btn.classList.remove('active');
-  }
-  render();
-}
-
-function initDragHint() {
-  const hint = document.getElementById('drag-hint');
-  if (hint) hint.classList.toggle('visible', items.length >= 2 && isEditMode);
-}
-
-// ─── Gestion des dossiers ──────────────────────────────────────────────────
+// ─── Gestion des dossiers ───────────────────────────────────────────────────
 function createNewFolder() {
-  const name = prompt("Nom du nouveau dossier :");
-  if (!name || !name.trim()) return;
+  const nameInput = document.getElementById('new-folder-name');
+  const name = nameInput.value.trim();
+  if(!name) return showToast('Indiquez un nom de dossier');
+  if(folders.includes(name)) return showToast('Ce dossier existe déjà');
   
-  items.push({
-    id: Date.now(),
-    type: 'folder',
-    title: name.trim(),
-    folderId: null, // Les dossiers sont toujours à la racine pour simplifier la structure
-    fav: false
-  });
-  
-  saveItems();
-  render();
+  folders.push(name);
+  localStorage.setItem('qr_folders_v1', JSON.stringify(folders));
+  nameInput.value = '';
   updateFolderSelects();
-}
-
-function enterFolder(id, name) {
-  if (isEditMode) return;
-  currentFolderId = id;
-  const pathBar = document.getElementById('folder-path-bar');
-  const pathName = document.getElementById('folder-path-name');
-  pathBar.style.display = "flex";
-  pathName.textContent = `📁 ${name}`;
-  render();
-}
-
-function exitFolder() {
-  currentFolderId = null;
-  document.getElementById('folder-path-bar').style.display = "none";
-  render();
+  showToast(`✓ Dossier "${name}" créé`);
 }
 
 function updateFolderSelects() {
-  const selectCreate = document.getElementById('in-folder');
-  if (!selectCreate) return;
+  const inFolder = document.getElementById('in-folder');
+  const filterFolder = document.getElementById('filter-folder');
   
-  let html = '<option value="">(Racine de la galerie)</option>';
-  items.forEach(i => {
-    if (i.type === 'folder') {
-      html += `<option value="${i.id}">📁 ${escapeHtml(i.title)}</option>`;
-    }
+  // Sauvegarde des sélections courantes
+  const currentIn = inFolder.value;
+  const currentFilterVal = filterFolder.value;
+  
+  // Reset
+  inFolder.innerHTML = '<option value="">Aucun dossier (Racine)</option>';
+  filterFolder.innerHTML = '<option value="all">Tous les dossiers</option><option value="">Sans dossier</option>';
+  
+  folders.forEach(f => {
+    inFolder.innerHTML += `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`;
+    filterFolder.innerHTML += `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`;
   });
-  selectCreate.innerHTML = html;
+  
+  // Restauration
+  inFolder.value = currentIn;
+  filterFolder.value = currentFilterVal;
 }
 
-// ─── Drag & Drop Modifié pour support Dossiers ──────────────────────────────
-function addDragEvents(card, realIdx) {
-  const handle = card.querySelector('.drag-handle');
-  if (!handle) return;
+function changeItemFolder(realIdx, newFolder) {
+  items[realIdx].folder = newFolder;
+  saveItems();
+  render();
+  showToast('✓ Dossier mis à jour pour ce QR');
+}
 
-  handle.addEventListener('mousedown', () => { card.setAttribute('draggable', 'true'); });
-  handle.addEventListener('mouseup', () => { card.removeAttribute('draggable'); });
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
+let dragSrcIdx = null;   
+let dragOverIdx = null;  
+
+function initDragHint() {
+  const hint = document.getElementById('drag-hint');
+  if (hint) hint.classList.toggle('visible', items.length >= 2);
+}
+
+function addDragEvents(card, realIdx) {
+  card.setAttribute('draggable', 'true');
 
   card.addEventListener('dragstart', (e) => {
+    if (e.target.tagName === 'SELECT') { e.preventDefault(); return; } // Évite les conflits avec le sélecteur de dossier
     dragSrcIdx = realIdx;
     card.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => card.classList.add('dragging'), 0);
   });
 
   card.addEventListener('dragend', () => {
     card.classList.remove('dragging');
-    card.removeAttribute('draggable');
-    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over', 'folder-drop-hover'));
-    
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
     if (dragSrcIdx !== null && dragOverIdx !== null && dragSrcIdx !== dragOverIdx) {
-      const targetItem = items[dragOverIdx];
-      const srcItem = items[dragSrcIdx];
-      
-      // Si on glisse un QR sur un DOSSIER
-      if (srcItem.type === 'qr' && targetItem && targetItem.type === 'folder') {
-        srcItem.folderId = targetItem.id;
-        saveItems();
-        showToast(`✓ Déplacé dans "${targetItem.title}"`);
-      } else {
-        // Réorganisation classique d'index
-        reorder(dragSrcIdx, dragOverIdx);
-      }
+      reorder(dragSrcIdx, dragOverIdx);
     }
-    dragSrcIdx = null; dragOverIdx = null;
-    render();
+    dragSrcIdx = null;
+    dragOverIdx = null;
   });
 
   card.addEventListener('dragover', (e) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (realIdx !== dragSrcIdx) {
-      const targetItem = items[realIdx];
-      const srcItem = items[dragSrcIdx];
-      
-      document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over', 'folder-drop-hover'));
-      
-      if (srcItem && srcItem.type === 'qr' && targetItem.type === 'folder') {
-        card.classList.add('folder-drop-hover');
-      } else {
-        card.classList.add('drag-over');
-      }
+      document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
       dragOverIdx = realIdx;
     }
   });
 
-  card.addEventListener('dragleave', () => card.classList.remove('drag-over', 'folder-drop-hover'));
+  card.addEventListener('dragleave', () => { card.classList.remove('drag-over'); });
+  card.addEventListener('drop', (e) => { e.preventDefault(); card.classList.remove('drag-over'); });
 
-  // Version Tactile mobile
+  // Touch API Mobile
   let touchStartX, touchStartY, touchClone, touchMoved = false;
 
-  handle.addEventListener('touchstart', (e) => {
-    dragSrcIdx = realIdx;
+  card.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.del-btn, .fav-btn, .folder-select-card')) return;
     touchMoved = false;
+    dragSrcIdx = realIdx;
     const touch = e.touches[0];
     touchStartX = touch.clientX;
     touchStartY = touch.clientY;
 
-    const rect = card.getBoundingClientRect();
     touchClone = card.cloneNode(true);
-    touchClone.className = 'qr-card drag-clone';
-    touchClone.style.cssText = `width: ${rect.width}px; height: ${rect.height}px; left: ${rect.left}px; top: ${rect.top}px;`;
+    touchClone.style.cssText = `
+      position: fixed; width: ${card.offsetWidth}px; left: ${card.getBoundingClientRect().left}px; top: ${card.getBoundingClientRect().top}px;
+      opacity: 0.85; border: 2px dashed var(--accent); pointer-events: none; z-index: 9999; border-radius: 10px; transform: scale(1.05); box-shadow: 0 12px 32px rgba(0,0,0,0.2); transition: none;
+    `;
     document.body.appendChild(touchClone);
-    card.classList.add('dragging');
+    card.style.opacity = '0.3';
   }, { passive: true });
 
-  handle.addEventListener('touchmove', (e) => {
+  card.addEventListener('touchmove', (e) => {
     if (dragSrcIdx === null || !touchClone) return;
     touchMoved = true;
-    if(e.cancelable) e.preventDefault();
-
+    e.preventDefault();
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartX;
     const dy = touch.clientY - touchStartY;
-    
-    const rect = card.getBoundingClientRect();
-    touchClone.style.left = (rect.left + dx) + 'px';
-    touchClone.style.top = (rect.top + dy) + 'px';
+    touchClone.style.left = (card.getBoundingClientRect().left + dx) + 'px';
+    touchClone.style.top = (card.getBoundingClientRect().top + dy) + 'px';
 
     touchClone.style.display = 'none';
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    touchClone.style.display = 'block';
-
+    touchClone.style.display = '';
     const targetCard = el ? el.closest('.qr-card') : null;
-    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over', 'folder-drop-hover'));
-    
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
     if (targetCard && targetCard !== card) {
-      const tIdx = parseInt(targetCard.dataset.realidx);
-      const srcItem = items[dragSrcIdx];
-      const targetItem = items[tIdx];
-      
-      if (srcItem && srcItem.type === 'qr' && targetItem && targetItem.type === 'folder') {
-        targetCard.classList.add('folder-drop-hover');
-      } else {
-        targetCard.classList.add('drag-over');
-      }
-      dragOverIdx = tIdx;
+      targetCard.classList.add('drag-over');
+      dragOverIdx = parseInt(targetCard.dataset.realidx);
     } else {
       dragOverIdx = null;
     }
   }, { passive: false });
 
-  handle.addEventListener('touchend', () => {
+  card.addEventListener('touchend', () => {
     if (touchClone) { touchClone.remove(); touchClone = null; }
-    card.classList.remove('dragging');
-    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over', 'folder-drop-hover'));
-    
+    card.style.opacity = '';
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+
     if (touchMoved && dragSrcIdx !== null && dragOverIdx !== null && dragSrcIdx !== dragOverIdx) {
-      const targetItem = items[dragOverIdx];
-      const srcItem = items[dragSrcIdx];
-      
-      if (srcItem.type === 'qr' && targetItem && targetItem.type === 'folder') {
-        srcItem.folderId = targetItem.id;
-        saveItems();
-        showToast(`✓ Déplacé dans "${targetItem.title}"`);
-      } else {
-        reorder(dragSrcIdx, dragOverIdx);
-      }
+      reorder(dragSrcIdx, dragOverIdx);
+    } else if (!touchMoved && dragSrcIdx !== null) {
+      openFocus(dragSrcIdx);
     }
-    dragSrcIdx = null; dragOverIdx = null; touchMoved = false;
-    render();
+    dragSrcIdx = null;
+    dragOverIdx = null;
+    touchMoved = false;
   });
 }
 
@@ -521,49 +459,48 @@ function reorder(fromIdx, toIdx) {
   const moved = items.splice(fromIdx, 1)[0];
   items.splice(toIdx, 0, moved);
   saveItems();
+  render();
+  showToast('✓ Ordre mis à jour');
 }
 
-// ─── Navigation Basique ─────────────────────────────────────────────────────
+// ─── Navigation ────────────────────────────────────────────────────────────
 function switchView(v, btn) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + v).classList.add('active');
   btn.classList.add('active');
-  if (v === 'gallery') {
-    exitFolder();
-    updateFolderSelects();
-  }
+  if (v === 'gallery') render();
 }
 
+// ─── Filtre galerie ─────────────────────────────────────────────────────────
 function setFilter(f, btn) {
   currentFilter = f;
-  document.querySelectorAll('.filter-btn:not(.edit-toggle-btn)').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   render();
 }
 
 function getFilteredItems() {
   const query = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const folderFilter = document.getElementById('filter-folder')?.value || 'all';
   
   return items
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => {
-      // Filtrage par favoris
       const matchFilter = currentFilter === 'fav' ? item.fav : true;
-      // Filtrage par barre de recherche
       const matchSearch = query ? item.title.toLowerCase().includes(query) : true;
       
-      if (query || currentFilter === 'fav') {
-        // Hors structure de dossier si recherche active ou vue favoris globale
-        return matchFilter && matchSearch && item.type === 'qr';
-      } else {
-        // Comportement standard : respect des dossiers
-        return item.folderId === currentFolderId;
+      // Filtrage par dossier
+      let matchFolder = true;
+      if (folderFilter !== 'all') {
+        matchFolder = (item.folder || '') === folderFilter;
       }
+      
+      return matchFilter && matchSearch && matchFolder;
     });
 }
 
-// ─── OCR Scanner ────────────────────────────────────────────────────────────
+// ─── OCR ───────────────────────────────────────────────────────────────────
 function openCropper(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -659,25 +596,14 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function createNew() {
   const t = document.getElementById('in-title').value.trim();
   const txt = document.getElementById('in-text').value.trim();
-  const destFolder = document.getElementById('in-folder').value;
-  
+  const folder = document.getElementById('in-folder').value;
   if (!t || !txt) return showToast('Remplis les deux champs');
   if (getStorageUsageKB() > STORAGE_LIMIT_KB) return showToast('⚠ Stockage plein — supprime des QR codes');
-  
   const tempArea = document.getElementById('temp-qr');
   tempArea.innerHTML = '';
   new QRCode(tempArea, { text: txt, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
-  
   waitForQRCanvas(tempArea, (finalImg) => {
-    items.push({ 
-      id: Date.now(), 
-      type: 'qr',
-      title: t, 
-      img: finalImg, 
-      text: txt,
-      folderId: destFolder ? parseInt(destFolder) : null,
-      fav: false
-    });
+    items.push({ id: Date.now(), title: t, img: finalImg, text: txt, folder: folder });
     saveItems(); updateCount();
     document.getElementById('in-title').value = '';
     document.getElementById('in-text').value = '';
@@ -692,6 +618,7 @@ function waitForQRCanvas(container, callback, attempts = 0) {
   else requestAnimationFrame(() => waitForQRCanvas(container, callback, attempts + 1));
 }
 
+// ─── Sauvegarde ───────────────────────────────────────────────────────────────
 function saveItems() {
   try { localStorage.setItem('qr_items_v1', JSON.stringify(items)); }
   catch(e) { showToast('⚠ Stockage insuffisant'); }
@@ -701,14 +628,15 @@ function getStorageUsageKB() {
   catch { return 0; }
 }
 
-// ─── Affichage Galerie ───────────────────────────────────────────────────────
+// ─── Galerie ─────────────────────────────────────────────────────────────────
 function render() {
   const grid = document.getElementById('display-grid');
   const filtered = getFilteredItems();
   initDragHint();
 
   if (filtered.length === 0) {
-    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--mid); font-size:0.85rem; font-family:var(--mono);">Vide ou aucun résultat</div>`;
+    const msg = currentFilter === 'fav' ? 'Aucun favori pour l\'instant ⭐' : 'Aucun QR code trouvé';
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--mid); font-size:0.85rem; font-family:var(--mono);">${msg}</div>`;
     updateStorageBar();
     return;
   }
@@ -717,44 +645,50 @@ function render() {
 
   filtered.forEach(({ item, idx: realIdx }) => {
     const card = document.createElement('div');
-    const isFolder = item.type === 'folder';
-    
-    card.className = 'qr-card' + (item.fav ? ' is-fav' : '') + (isEditMode ? ' reordering' : '') + (isFolder ? ' is-folder' : '');
+    card.className = 'qr-card' + (item.fav ? ' is-fav' : '');
     card.dataset.realidx = realIdx;
 
-    if (isFolder) {
-      const childrenCount = items.filter(i => i.folderId === item.id).length;
-      card.innerHTML = `
-        <button class="del-btn" title="Supprimer">✕</button>
-        <div class="drag-handle" title="Déplacer">☰</div>
-        <div class="folder-icon-wrap">📁</div>
-        <p>${escapeHtml(item.title)}</p>
-        <div class="folder-count">${childrenCount} élement(s)</div>
-      `;
-      card.addEventListener('click', () => {
-        if (!isEditMode) enterFolder(item.id, item.title);
-      });
-    } else {
-      card.innerHTML = `
-        <button class="fav-btn" title="Favori">${item.fav ? '⭐' : '☆'}</button>
-        <button class="del-btn" title="Supprimer">✕</button>
-        <div class="drag-handle" title="Déplacer">☰</div>
-        <img src="${item.img}" alt="QR ${escapeHtml(item.title)}">
-        <p>${escapeHtml(item.title)}</p>
-      `;
-      card.querySelector('.fav-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        items[realIdx].fav = !items[realIdx].fav;
-        saveItems(); render();
-      });
-      card.addEventListener('click', () => {
-        if (!isEditMode) openFocus(realIdx);
-      });
-    }
+    // Construction dynamique des options pour changer le dossier du QR existant
+    let optionsHtml = `<option value="">📁 Sans dossier</option>`;
+    folders.forEach(f => {
+      optionsHtml += `<option value="${escapeHtml(f)}" ${item.folder === f ? 'selected' : ''}>📁 ${escapeHtml(f)}</option>`;
+    });
 
+    card.innerHTML = `
+      <button class="fav-btn" title="Favori">${item.fav ? '⭐' : '☆'}</button>
+      <button class="del-btn" title="Supprimer">✕</button>
+      <div>
+        <img src="${item.img}" alt="QR ${escapeHtml(item.title)}">
+        <p style="font-size:0.7rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.title)}</p>
+      </div>
+      <select class="folder-select-card" title="Déplacer vers un dossier">
+        ${optionsHtml}
+      </select>
+    `;
+
+    // Événement changement de dossier pour le QR existant
+    card.querySelector('.folder-select-card').addEventListener('change', (e) => {
+      changeItemFolder(realIdx, e.target.value);
+    });
+
+    // Bouton favori
+    card.querySelector('.fav-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      items[realIdx].fav = !items[realIdx].fav;
+      saveItems(); render();
+      showToast(items[realIdx].fav ? '⭐ Ajouté aux favoris' : 'Retiré des favoris');
+    });
+
+    // Bouton supprimer
     card.querySelector('.del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       showDeleteModal(realIdx);
+    });
+
+    // Clic pour ouvrir le focus
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.del-btn, .fav-btn, .folder-select-card')) return;
+      openFocus(realIdx);
     });
 
     addDragEvents(card, realIdx);
@@ -767,180 +701,76 @@ function render() {
 function updateStorageBar() {
   const usedKB = getStorageUsageKB();
   const pct = Math.min(100, Math.round((usedKB / STORAGE_LIMIT_KB) * 100));
-  const elFill = document.getElementById('storage-fill');
-  if(elFill) {
-    elFill.style.width = pct + '%';
-    elFill.style.background = pct > 80 ? '#e53e3e' : 'var(--accent)';
-  }
-  const elLbl = document.getElementById('storage-label');
-  if(elLbl) elLbl.innerText = `${usedKB} Ko / ${STORAGE_LIMIT_KB} Ko`;
+  document.getElementById('storage-fill').style.width = pct + '%';
+  document.getElementById('storage-fill').style.background = pct > 80 ? '#e53e3e' : 'var(--accent)';
+  document.getElementById('storage-label').innerText = `${usedKB} Ko / ${STORAGE_LIMIT_KB} Ko`;
 }
 
-// ─── Mode Focus ─────────────────────────────────────────────────────────────
+// ─── Focus ────────────────────────────────────────────────────────────────────
 function openFocus(idx) {
   const item = items[idx];
-  if (!item || item.type === 'folder') return;
+  if (!item) return;
   focusIdx = idx;
-  
-  cancelFocusEditMode();
-  const box = document.getElementById('focus-decoded-box');
-  box.style.display = "none";
-  box.innerText = "";
-  
   renderFocus();
   document.getElementById('focus-mode').style.display = 'flex';
 }
 
 function renderFocus() {
-  const filtered = getFilteredItems().filter(f => f.item.type === 'qr');
+  const filtered = getFilteredItems();
   const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
   const item = items[focusIdx];
   if (!item) return;
   focusImgSrc = item.img;
-  
   document.getElementById('focus-title').innerText = item.title;
-  document.getElementById('focus-qr-display').innerHTML = `<img id="focus-qr-img" src="${item.img}" style="width:220px; max-width:100%; display:block;">`;
-  
-  const total = filtered.length;
+  document.getElementById('focus-qr-display').innerHTML = `<img src="${item.img}" style="width:200px; display:block;">`;
+  const total = filtered.length || items.length;
   const pos = posInFiltered >= 0 ? posInFiltered + 1 : '?';
   document.getElementById('nav-counter').innerText = `${pos} / ${total}`;
-  document.getElementById('nav-prev').disabled = posInFiltered <= 0 || isFocusEditing;
-  document.getElementById('nav-next').disabled = posInFiltered >= filtered.length - 1 || isFocusEditing;
+  document.getElementById('nav-prev').disabled = posInFiltered <= 0;
+  document.getElementById('nav-next').disabled = posInFiltered >= filtered.length - 1;
   document.getElementById('focus-fav-btn').innerText = item.fav ? '⭐' : '☆';
 }
 
-function scanCurrentFocusQR() {
-  const imgElement = document.getElementById('focus-qr-img');
-  const box = document.getElementById('focus-decoded-box');
-  if (!imgElement) return;
-
-  const html5QrCode = new Html5Qrcode("temp-qr");
-  
-  fetch(imgElement.src)
-    .then(res => res.blob())
-    .then(blob => {
-      const file = new File([blob], "qr_image.png", { type: "image/png" });
-      
-      html5QrCode.scanFile(file, true)
-        .then(decodedText => {
-          box.innerText = "Contenu détecté :\n" + decodedText;
-          box.style.display = "block";
-          box.scrollIntoView({ behavior: 'smooth' });
-          if (navigator.vibrate) navigator.vibrate(40);
-          showToast("✓ QR Code lu !");
-        })
-        .catch(err => {
-          const backupText = items[focusIdx] ? items[focusIdx].text : "";
-          if (backupText) {
-            box.innerText = "Contenu (Secours Local) :\n" + backupText;
-            box.style.display = "block";
-          } else {
-            showToast("⚠ Impossible de lire le QR");
-          }
-        });
-    });
-}
-
-function enableFocusEditMode() {
-  isFocusEditing = true;
-  const item = items[focusIdx];
-  if(!item) return;
-
-  document.getElementById('nav-prev').disabled = true;
-  document.getElementById('nav-next').disabled = true;
-
-  document.getElementById('edit-focus-title').value = item.title;
-  document.getElementById('edit-focus-text').value = item.text || "";
-
-  // Charger la liste des dossiers pour le sélecteur
-  const selectEdit = document.getElementById('edit-focus-folder');
-  let html = '<option value="">(Racine de la galerie)</option>';
-  items.forEach(i => {
-    if (i.type === 'folder') {
-      html += `<option value="${i.id}" ${item.folderId === i.id ? 'selected' : ''}>📁 ${escapeHtml(i.title)}</option>`;
-    }
-  });
-  selectEdit.innerHTML = html;
-
-  document.getElementById('focus-title').style.display = "none";
-  document.getElementById('focus-qr-display').style.display = "none";
-  document.getElementById('focus-decoded-box').style.display = "none";
-  
-  document.getElementById('focus-edit-container').style.display = "flex";
-  document.getElementById('focus-normal-actions').style.display = "none";
-  document.getElementById('focus-edit-actions').style.display = "flex";
-}
-
-function cancelFocusEditMode() {
-  isFocusEditing = false;
-  document.getElementById('focus-title').style.display = "block";
-  document.getElementById('focus-qr-display').style.display = "flex";
-  document.getElementById('focus-edit-container').style.display = "none";
-  document.getElementById('focus-normal-actions').style.display = "flex";
-  document.getElementById('focus-edit-actions').style.display = "none";
-  renderFocus();
-}
-
-function saveFocusModifications() {
-  const newTitle = document.getElementById('edit-focus-title').value.trim();
-  const newText = document.getElementById('edit-focus-text').value.trim();
-  const newFolder = document.getElementById('edit-focus-folder').value;
-
-  if(!newTitle || !newText) return showToast("Ne laissez pas de champs vides");
-
-  const tempArea = document.getElementById('temp-qr');
-  tempArea.innerHTML = '';
-  new QRCode(tempArea, { text: newText, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
-  
-  waitForQRCanvas(tempArea, (finalImg) => {
-    items[focusIdx].title = newTitle;
-    items[focusIdx].text = newText;
-    items[focusIdx].img = finalImg;
-    items[focusIdx].folderId = newFolder ? parseInt(newFolder) : null;
-    
-    saveItems();
-    showToast("✓ Modifications enregistrées !");
-    cancelFocusEditMode();
-    closeFocus();
-    render();
-  });
-}
-
 function navigateFocus(dir) {
-  if (isFocusEditing) return;
-  const filtered = getFilteredItems().filter(f => f.item.type === 'qr');
+  const filtered = getFilteredItems();
   const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
   const newPos = posInFiltered + dir;
   if (newPos < 0 || newPos >= filtered.length) return;
   focusIdx = filtered[newPos].idx;
-  
-  document.getElementById('focus-decoded-box').style.display = "none";
   renderFocus();
 }
 
 function toggleFocusFav() {
   items[focusIdx].fav = !items[focusIdx].fav;
   saveItems(); renderFocus(); render();
+  showToast(items[focusIdx].fav ? '⭐ Ajouté aux favoris' : 'Retiré des favoris');
 }
 function closeFocus() { document.getElementById('focus-mode').style.display = 'none'; }
 function downloadFocus() {
   if (!focusImgSrc) return;
   const a = document.createElement('a');
   a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
+  showToast('Téléchargement lancé');
 }
 
-// ─── Cloud & Backup ─────────────────────────────────────────────────────────
+// ─── Google Drive + Synchronisation ──────────────────────────────────────────
 const DRIVE_CLIENT_ID = '510292526417-007bs9oh8tdif3hgkr4ov33ns7ctl5kq.apps.googleusercontent.com';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FILE_NAME = 'qr-pro-backup.json';
-let driveToken = null; let driveFileId = null; let driveTokenClient = null; let driveSyncPending = false;
+let driveToken = null;
+let driveFileId = null;
+let driveTokenClient = null;
+let driveSyncPending = false;
 
 window.addEventListener('load', () => {
+  updateFolderSelects(); // Initialise les dossiers au démarrage
   const wait = setInterval(() => {
     if (window.google && google.accounts) {
       clearInterval(wait);
       driveTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: DRIVE_CLIENT_ID, scope: DRIVE_SCOPES, callback: onDriveToken,
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPES,
+        callback: onDriveToken,
       });
       const saved = sessionStorage.getItem('qrpro_token');
       if (saved) { driveToken = saved; setDriveUI(true); }
@@ -961,8 +791,9 @@ function onDriveToken(resp) {
 function setDriveUI(connected) {
   const dot = document.getElementById('drive-dot');
   const label = document.getElementById('drive-label');
-  if (dot) dot.style.background = connected ? '#6FCF97' : '#aaa';
-  if (label) label.textContent = connected ? 'Drive connecté' : 'Drive';
+  if (!dot) return;
+  dot.style.background = connected ? '#6FCF97' : '#aaa';
+  label.textContent = connected ? 'Drive connecté' : 'Drive';
 }
 
 function toggleDrive() {
@@ -998,14 +829,18 @@ async function writeToDrive(data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   if (!driveFileId) driveFileId = await findDriveFile();
   if (driveFileId) {
-    await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method: 'PATCH', body: blob, headers: { 'Content-Type': 'application/json' } });
+    await driveReq(
+      `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+      { method: 'PATCH', body: blob, headers: { 'Content-Type': 'application/json' } }
+    );
   } else {
     const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
     form.append('file', blob);
     const r = await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', body: form });
-    const d = await r.json(); driveFileId = d.id;
+    const d = await r.json();
+    driveFileId = d.id;
   }
 }
 
@@ -1013,39 +848,49 @@ async function syncDrive() {
   if (!driveToken) {
     driveSyncPending = true;
     if (!driveTokenClient) { showToast('Google en chargement…'); return; }
-    driveTokenClient.requestAccessToken(); return;
+    driveTokenClient.requestAccessToken();
+    return;
   }
+
   setSyncUI(true);
   try {
     if (!driveFileId) driveFileId = await findDriveFile();
     let driveItems = [];
     if (driveFileId) {
       const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-      const data = await r.json(); driveItems = Array.isArray(data) ? data : [];
+      const data = await r.json();
+      driveItems = Array.isArray(data) ? data : [];
     }
+
     const localIds = new Set(items.map(i => i.id));
     const driveIds = new Set(driveItems.map(i => i.id));
-    const onlyOnDrive = driveItems.filter(i => !localIds.has(i.id));
-    const onlyOnLocal = items.filter(i => !driveIds.has(i.id));
-    
-    // Normaliser les types lors de la synchro au cas où
-    onlyOnDrive.forEach(i => {
-      if(i.type === undefined) i.type = 'qr';
-      if(i.folderId === undefined) i.folderId = null;
-    });
 
-    const merged = [...items, ...onlyOnDrive];
+    const onlyOnDrive = driveItems.filter(i => !localIds.has(i.id));   
+    const onlyOnLocal = items.filter(i => !driveIds.has(i.id));        
+
+    const merged = [...items, ...onlyOnDrive]; 
+
     let msg = '';
-    if (onlyOnDrive.length === 0 && onlyOnLocal.length === 0) { msg = '✓ Déjà synchronisé'; }
-    else {
+    if (onlyOnDrive.length === 0 && onlyOnLocal.length === 0) {
+      msg = '✓ Déjà synchronisé — rien à faire';
+    } else {
       const parts = [];
-      if (onlyOnDrive.length) parts.push(`+${onlyOnDrive.length} depuis Drive`);
-      if (onlyOnLocal.length) parts.push(`+${onlyOnLocal.length} vers Drive`);
+      if (onlyOnDrive.length) parts.push(`+${onlyOnDrive.length} chargé(s) depuis Drive`);
+      if (onlyOnLocal.length) parts.push(`+${onlyOnLocal.length} envoyé(s) vers Drive`);
       msg = '✓ ' + parts.join(' · ');
     }
-    items = merged; saveItems(); updateCount(); render();
-    await writeToDrive(merged); showToast(msg);
-  } catch(e) { showToast('Erreur sync : ' + e.message); }
+
+    items = merged;
+    saveItems();
+    updateCount();
+    render();
+
+    await writeToDrive(merged);
+
+    showToast(msg);
+  } catch(e) {
+    showToast('Erreur sync : ' + e.message);
+  }
   setSyncUI(false);
 }
 
@@ -1054,9 +899,12 @@ function setSyncUI(loading) {
   const icon = document.getElementById('sync-icon');
   if (!btn) return;
   if (loading) {
-    btn.disabled = true; icon.style.display = 'inline-block'; icon.style.animation = 'spin 0.8s linear infinite';
+    btn.disabled = true;
+    icon.style.display = 'inline-block';
+    icon.style.animation = 'spin 0.8s linear infinite';
   } else {
-    btn.disabled = false; icon.style.animation = '';
+    btn.disabled = false;
+    icon.style.animation = '';
   }
 }
 
@@ -1069,105 +917,82 @@ function importJSON(event) {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data)) return showToast('⚠ Fichier invalide');
       const existingIds = new Set(items.map(i => i.id));
-      
-      const newItems = data.filter(i => i.id && i.title && !existingIds.has(i.id));
-      newItems.forEach(i => {
-        if(i.type === undefined) i.type = 'qr';
-        if(i.folderId === undefined) i.folderId = null;
-      });
-
-      items = [...newItems, ...items]; saveItems(); updateCount(); render();
-      showToast(`✓ ${newItems.length} élément(s) importé(s)`);
+      const newItems = data.filter(i => i.id && i.title && i.img && !existingIds.has(i.id));
+      items = [...newItems, ...items];
+      saveItems(); updateCount(); render();
+      showToast(`✓ ${newItems.length} QR importé(s)`);
     } catch { showToast('⚠ Fichier JSON invalide'); }
   };
-  reader.readAsText(file); event.target.value = '';
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
-// ─── Suppression ────────────────────────────────────────────────────────────
+
+// ─── Suppression définitive ──────────────────────────────────────────────────
 let pendingDeleteIdx = null;
+
 function showDeleteModal(idx) {
   pendingDeleteIdx = idx;
-  const target = items[idx];
-  if (!target) return;
-  
-  const title = target.title;
+  const title = items[idx] ? items[idx].title : '';
   document.getElementById('del-modal-title').textContent = `Supprimer "${title}" ?`;
-  
-  if (target.type === 'folder') {
-    document.getElementById('del-modal-desc').innerHTML = "Attention: C'est un dossier !<br>Tu veux supprimer le dossier ET tout ce qu'il contient ?";
-    document.getElementById('btn-del-everywhere').textContent = "🗑 Supprimer le dossier + son contenu";
-    document.getElementById('btn-del-local').textContent = "📁 Supprimer le dossier vide uniquement";
-  } else {
-    document.getElementById('del-modal-desc').textContent = "Veux-tu aussi le supprimer de Google Drive ?";
-    document.getElementById('btn-del-everywhere').textContent = "🗑 Supprimer partout (local + Drive)";
-    document.getElementById('btn-del-local').textContent = "Supprimer uniquement en local";
-  }
-  
   document.getElementById('del-modal').style.display = 'flex';
 }
-
-function closeDeleteModal() { document.getElementById('del-modal').style.display = 'none'; pendingDeleteIdx = null; }
-
-async function confirmDelete(optionPlus) {
+function closeDeleteModal() {
+  document.getElementById('del-modal').style.display = 'none';
+  pendingDeleteIdx = null;
+}
+async function confirmDelete(alsoFromDrive) {
   if (pendingDeleteIdx === null) return;
-  const idx = pendingDeleteIdx; 
-  const target = items[idx];
+  const idx = pendingDeleteIdx;
   closeDeleteModal();
-  
-  if (target.type === 'folder') {
-    if (optionPlus) {
-      // Supprime le dossier + les enfants rangeant dedans
-      items = items.filter(i => i.folderId !== target.id);
-    } else {
-      // Supprime juste le dossier, remet les enfants à la racine
-      items.forEach(i => { if(i.folderId === target.id) i.folderId = null; });
-    }
-    items.splice(idx, 1);
-    showToast('✓ Dossier supprimé');
-  } else {
-    // QR classique
-    if (optionPlus && driveToken) {
-      try {
-        if (!driveFileId) driveFileId = await findDriveFile();
-        if (driveFileId) {
-          const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-          let driveItems = await r.json();
-          if (Array.isArray(driveItems)) {
-            const removedId = items[idx].id;
-            driveItems = driveItems.filter(i => i.id !== removedId);
-            await writeToDrive(driveItems);
-          }
+
+  if (alsoFromDrive && driveToken) {
+    try {
+      if (!driveFileId) driveFileId = await findDriveFile();
+      if (driveFileId) {
+        const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+        let driveItems = await r.json();
+        if (Array.isArray(driveItems)) {
+          const removedId = items[idx].id;
+          driveItems = driveItems.filter(i => i.id !== removedId);
+          await writeToDrive(driveItems);
         }
-        showToast('✓ Supprimé localement et sur Drive');
-      } catch(e) { showToast('Supprimé localement — erreur Drive : ' + e.message); }
-    } else { showToast('✓ QR supprimé localement'); }
-    items.splice(idx, 1);
+      }
+      showToast('✓ Supprimé localement et sur Drive');
+    } catch(e) {
+      showToast('Supprimé localement — erreur Drive : ' + e.message);
+    }
+  } else if (alsoFromDrive && !driveToken) {
+    showToast('Supprimé localement — connecte Drive pour supprimer aussi du Drive');
+  } else {
+    showToast('✓ QR supprimé localement');
   }
-  
-  saveItems(); updateCount(); render(); updateFolderSelects();
+
+  items.splice(idx, 1);
+  saveItems(); updateCount(); render();
 }
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
-function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function updateCount() { document.getElementById('b-total').innerText = items.filter(i => i.type === 'qr').length; }
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function updateCount() {
+  document.getElementById('b-total').innerText = items.length;
+}
 function showToast(m) {
   const t = document.getElementById('toast');
   t.innerText = m; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
-
-// Lancement global
-updateCount();
-updateFolderSelects();
 </script>
 
 <div id="del-modal">
   <div class="del-modal-box">
-    <h3 id="del-modal-title">Supprimer ?</h3>
-    <p id="del-modal-desc">Action irréversible</p>
+    <h3 id="del-modal-title">Supprimer ce QR ?</h3>
+    <p>Veux-tu aussi le supprimer de Google Drive ?</p>
     <div class="del-modal-actions">
-      <button class="del-btn-drive" id="btn-del-everywhere" onclick="confirmDelete(true)">🗑 Tout supprimer</button>
-      <button class="del-btn-local" id="btn-del-local" onclick="confirmDelete(false)">Option secondaire</button>
+      <button class="del-btn-drive" onclick="confirmDelete(true)">🗑 Supprimer partout (local + Drive)</button>
+      <button class="del-btn-local" onclick="confirmDelete(false)">Supprimer uniquement en local</button>
       <button class="del-btn-cancel" onclick="closeDeleteModal()">Annuler</button>
     </div>
   </div>
