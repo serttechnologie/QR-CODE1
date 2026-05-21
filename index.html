@@ -43,6 +43,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .btn-main { background:var(--ink); color:var(--paper); border:none; border-radius:14px; padding:18px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-family: var(--sans); font-size: 1rem; transition: opacity 0.2s; }
 .btn-main:active { opacity: 0.8; }
 .ocr-trigger { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; cursor: pointer; align-self: flex-end; margin-bottom: -5px; font-family: var(--sans); }
+.scanner-trigger { background: var(--ink); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; cursor: pointer; align-self: flex-end; margin-bottom: -5px; font-family: var(--sans); }
 
 #ocr-loader { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 16px; }
 #ocr-steps { display: flex; flex-direction: column; gap: 8px; width: 260px; }
@@ -60,6 +61,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 #crop-modal { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
 .crop-container { flex: 1; position: relative; overflow: hidden; }
 .crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
+
+/* ── Live QR Scanner Modal ── */
+#scanner-modal { position: fixed; inset: 0; background: #000; z-index: 1500; display: none; flex-direction: column; }
+.scanner-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+#camera-preview { width: 100%; height: 100%; object-fit: cover; }
+.scanner-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
 
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 15px; }
 
@@ -187,13 +194,25 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
   </div>
 </div>
 
+<div id="scanner-modal">
+  <div class="scanner-container">
+    <div id="camera-preview"></div>
+  </div>
+  <div class="scanner-controls">
+    <button onclick="stopLiveScanner()" style="flex:1; padding:15px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700; cursor:pointer;">Annuler</button>
+  </div>
+</div>
+
 <div id="temp-qr"></div>
 
 <main id="view-create" class="view active">
   <div class="create-wrap">
     <h2 style="font-size:1.8rem; font-weight:800;">Nouveau QR</h2>
     <div class="field-group">
-      <label>Nom</label>
+      <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <label>Nom</label>
+        <button class="scanner-trigger" onclick="startLiveScanner()">📷 Scanner un QR</button>
+      </div>
       <input type="text" id="in-title" placeholder="Ex: WiFi maison">
     </div>
     <div class="field-group">
@@ -301,6 +320,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 // ─── État global ────────────────────────────────────────────────────────────
 let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
 let cropper;
+let liveScannerInstance = null;
 let focusImgSrc = '';
 let focusIdx = 0;
 let currentFilter = 'all';
@@ -655,6 +675,62 @@ function closeCrop() {
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+
+// ─── Scanner de QR en direct (Caméra) ─────────────────────────────────────────
+function startLiveScanner() {
+  document.getElementById('scanner-modal').style.display = 'flex';
+  
+  // Initialisation de Html5Qrcode sur la div de preview
+  liveScannerInstance = new Html5Qrcode("camera-preview");
+  
+  const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+    // Si un QR code est trouvé
+    document.getElementById('in-text').value = decodedText;
+    
+    // Essayer de deviner un titre automatique si c'est une URL
+    if(decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
+      try {
+        const urlObj = new URL(decodedText);
+        document.getElementById('in-title').value = "Lien: " + urlObj.hostname;
+      } catch(e) {
+        document.getElementById('in-title').value = "QR Scanné";
+      }
+    } else {
+      document.getElementById('in-title').value = "QR Scanné";
+    }
+    
+    showToast("✓ Code lu avec succès !");
+    stopLiveScanner();
+  };
+  
+  const config = { fps: 10, qrbox: (width, height) => {
+    const minSize = Math.min(width, height);
+    return { width: Math.round(minSize * 0.7), height: Math.round(minSize * 0.7) };
+  }};
+  
+  // Lance la caméra arrière par défaut
+  liveScannerInstance.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+    .catch(err => {
+      console.error("Erreur de caméra: ", err);
+      showToast("⚠ Impossible d'accéder à la caméra");
+      stopLiveScanner();
+    });
+}
+
+function stopLiveScanner() {
+  document.getElementById('scanner-modal').style.display = 'none';
+  if (liveScannerInstance) {
+    liveScannerInstance.stop().then(() => {
+      liveScannerInstance.clear();
+      liveScannerInstance = null;
+    }).catch(err => {
+      console.error("Erreur à l'arrêt du scanner: ", err);
+      liveScannerInstance = null;
+    });
+  }
+}
+
+
 // ─── Création QR ─────────────────────────────────────────────────────────────
 function createNew() {
   const t = document.getElementById('in-title').value.trim();
@@ -918,17 +994,6 @@ function navigateFocus(dir) {
   renderFocus();
 }
 
-function toggleFocusFav() {
-  items[focusIdx].fav = !items[focusIdx].fav;
-  saveItems(); renderFocus(); render();
-}
-function closeFocus() { document.getElementById('focus-mode').style.display = 'none'; }
-function downloadFocus() {
-  if (!focusImgSrc) return;
-  const a = document.createElement('a');
-  a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
-}
-
 // ─── Cloud & Backup ─────────────────────────────────────────────────────────
 const DRIVE_CLIENT_ID = '510292526417-007bs9oh8tdif3hgkr4ov33ns7ctl5kq.apps.googleusercontent.com';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -1154,6 +1219,17 @@ function showToast(m) {
   const t = document.getElementById('toast');
   t.innerText = m; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function toggleFocusFav() {
+  items[focusIdx].fav = !items[focusIdx].fav;
+  saveItems(); renderFocus(); render();
+}
+function closeFocus() { document.getElementById('focus-mode').style.display = 'none'; }
+function downloadFocus() {
+  if (!focusImgSrc) return;
+  const a = document.createElement('a');
+  a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
 }
 
 // Lancement global
