@@ -210,13 +210,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 <div id="camera-modal">
   <div class="camera-container">
     <div style="font-size:1rem; font-weight:800; margin-bottom:12px; text-align:center; opacity:0.9;">Placer le code dans le cadre</div>
-    <div id="camera-reader" style="position:relative;">
-      <div id="scan-zone-overlay">
-        <div class="scan-corner-tr"></div>
-        <div class="scan-corner-bl"></div>
-        <div id="scan-resize-handle" title="Glisse pour redimensionner">⤡</div>
-      </div>
-    </div>
+    <div id="camera-reader" style="position:relative;"></div>
     <div style="margin-top:10px; font-family:var(--mono); font-size:0.7rem; opacity:0.55; text-align:center;">Glisse ⤡ pour ajuster la zone · <span id="scan-size-val">250px</span></div>
   </div>
   <div class="camera-controls">
@@ -684,14 +678,33 @@ function onSliderChange(val) {
   scanResizeDebounce = setTimeout(() => startHtml5Scanner(currentScanSize), 350);
 }
 
+function resetReaderDiv() {
+  // Vide complètement le div et remet l'overlay dedans
+  const reader = document.getElementById('camera-reader');
+  reader.innerHTML = `
+    <div id="scan-zone-overlay">
+      <div class="scan-corner-tr"></div>
+      <div class="scan-corner-bl"></div>
+      <div id="scan-resize-handle" title="Glisse pour redimensionner">⤡</div>
+    </div>`;
+  // Réinitialise le flag pour re-attacher les events
+  const handle = document.getElementById('scan-resize-handle');
+  if (handle) handle._resizeInited = false;
+  updateScanOverlaySize(currentScanSize);
+  initScanResizeHandle();
+}
+
 function startHtml5Scanner(qrboxSize) {
   if (html5QrScannerInstance) {
-    html5QrScannerInstance.stop().then(() => {
-      initScannerConfig(qrboxSize);
-    }).catch(() => {
-      initScannerConfig(qrboxSize);
-    });
+    html5QrScannerInstance.stop()
+      .catch(() => {})
+      .finally(() => {
+        html5QrScannerInstance = null;
+        resetReaderDiv();
+        initScannerConfig(qrboxSize);
+      });
   } else {
+    resetReaderDiv();
     initScannerConfig(qrboxSize);
   }
 }
@@ -713,11 +726,9 @@ function initScannerConfig(qrboxSize) {
       showToast("✓ Code détecté !");
       closeCameraScanner();
     },
-    (errorMessage) => {
-      // Ignorer les erreurs de scan silencieuses lors de la recherche
-    }
+    () => { /* erreurs silencieuses pendant la recherche */ }
   ).catch(err => {
-    console.error("Erreur d'accès à la caméra : ", err);
+    console.error("Erreur caméra : ", err);
     showToast("⚠ Erreur d'accès à la caméra");
     closeCameraScanner();
   });
@@ -731,7 +742,8 @@ function closeCameraScanner() {
   document.getElementById('camera-modal').style.display = 'none';
   clearTimeout(scanResizeDebounce);
   if (html5QrScannerInstance) {
-    html5QrScannerInstance.stop().catch(err => console.log(err));
+    html5QrScannerInstance.stop().catch(() => {});
+    html5QrScannerInstance = null;
   }
 }
 
