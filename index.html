@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>QR PRO</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+:root {
+  --bg: #f0ede6; --paper: #fdfbf7; --ink: #1a1814; --mid: #8a8578;
+  --accent: #d4621a; --border: #d8d3c8; --mono: 'DM Mono', monospace; --sans: 'Bricolage Grotesque', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+body { background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh; display:flex; flex-direction:column; overflow-x: hidden; }
+
+header { border-bottom:2px solid var(--ink); padding:0 15px; display:flex; align-items:stretch; justify-content:space-between; background:var(--paper); position:sticky; top:0; z-index:100; height:60px; }
+.logo { display:flex; align-items:center; gap:8px; }
+.logo-icon { width:22px; height:22px; background:var(--ink); border-radius:4px; display:grid; grid-template-columns:1fr 1fr; gap:2px; padding:4px; }
+.logo-icon span { background:var(--paper); border-radius:1px; }
+nav { display:flex; }
+.tab { font-family:var(--mono); font-size:.75rem; padding:0 15px; border:none; border-bottom:3px solid transparent; background:transparent; color:var(--mid); cursor:pointer; font-weight:600; }
+.tab.active { color:var(--ink); border-bottom-color:var(--accent); }
+.badge { background:var(--accent); color:white; border-radius:10px; padding:1px 6px; font-size:.6rem; margin-left:4px; }
+
+.view { display:none; animation: fadeIn 0.2s ease; }
+.view.active { display:block; }
+@keyframes fadeIn { from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:translateY(0)} }
+
+.create-wrap { max-width:500px; margin:0 auto; padding:30px 20px; display:flex; flex-direction:column; gap:20px; }
+.field-group { display:flex; flex-direction:column; gap:6px; position: relative; }
+label { font-size:.8rem; font-weight:700; color:var(--mid); }
+input, textarea, select { font-family:var(--mono); font-size:16px; background:var(--paper); border:1.5px solid var(--border); border-radius:12px; padding:14px; width:100%; outline:none; transition: border-color 0.2s; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+
+.btn-main { background:var(--ink); color:var(--paper); border:none; border-radius:14px; padding:18px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-family: var(--sans); font-size: 1rem; transition: opacity 0.2s; }
+.btn-main:active { opacity: 0.8; }
+.ocr-trigger { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; cursor: pointer; align-self: flex-end; margin-bottom: -5px; font-family: var(--sans); }
+
+/* OCR Progress */
+#ocr-loader { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 16px; }
+#ocr-steps { display: flex; flex-direction: column; gap: 8px; width: 260px; }
+.ocr-step { font-size: 0.75rem; font-family: var(--mono); color: #aaa; display: flex; align-items: center; gap: 8px; transition: color 0.3s; }
+.ocr-step.active { color: white; }
+.ocr-step.done { color: #6fcf97; }
+.ocr-step-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; transition: background 0.3s; }
+.ocr-step.active .ocr-step-dot { background: var(--accent); animation: pulse 1s infinite; }
+.ocr-step.done .ocr-step-dot { background: #6fcf97; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.ocr-bar-wrap { width: 260px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
+.ocr-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+
+/* Modal crop */
+#crop-modal { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
+.crop-container { flex: 1; position: relative; overflow: hidden; }
+.crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
+
+/* ── Galerie ── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+/* ── QR Card ── */
+.qr-card {
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 7px;
+  position: relative;
+  text-align: center;
+  cursor: grab;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.qr-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+.qr-card img { width:100%; border-radius:4px; margin-bottom:5px; pointer-events: none; }
+.del-btn { position: absolute; top: 4px; right: 4px; background: var(--ink); border: none; border-radius: 50%; width: 18px; height: 18px; color: white; font-size: 0.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; }
+
+/* Style discret pour le changement de dossier dans les cartes */
+.folder-card-select {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  padding: 2px;
+  margin-top: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  outline: none;
+  width: 100%;
+}
+
+/* ── Drag & Drop états ── */
+.qr-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.96);
+  border-color: var(--accent);
+  cursor: grabbing;
+  box-shadow: none;
+}
+.qr-card.drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px rgba(212, 98, 26, 0.2);
+}
+/* Indicateur de mode réorganisation */
+.drag-hint {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--mid);
+  text-align: center;
+  padding: 4px 15px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.drag-hint.visible { opacity: 1; }
+.drag-handle-icon { font-size: 0.8rem; }
+
+/* Stockage warning */
+.storage-bar-wrap { margin: 0 15px 10px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+.storage-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.storage-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s; }
+.storage-label { font-family: var(--mono); font-size: 0.65rem; color: var(--mid); white-space: nowrap; }
+
+/* Favoris */
+.fav-btn { position: absolute; top: 4px; left: 5px; background: none; border: none; font-size: 1rem; cursor: pointer; opacity: 1; line-height: 1; padding: 0; z-index: 10; }
+
+/* Galerie toolbar */
+.gallery-toolbar { padding: 10px 15px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search-input { font-family: var(--mono); font-size: 0.8rem; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; flex: 1; min-width: 120px; outline: none; transition: border-color 0.2s; }
+.search-input:focus { border-color: var(--accent); }
+.filter-btn { font-family: var(--mono); font-size: 0.7rem; font-weight: 700; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--paper); color: var(--mid); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.filter-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Import / Export */
+.io-toolbar { padding: 8px 15px 0; display: flex; gap: 8px; }
+.io-btn { font-family: var(--mono); font-size: 0.7rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--paper); color: var(--ink); cursor: pointer; transition: all 0.2s; flex: 1; text-align: center; }
+.io-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Focus overlay */
+.focus-overlay { position: fixed; inset:0; background: rgba(245, 242, 235, 0.98); backdrop-filter: blur(8px); z-index: 200; display: none; flex-direction: column; align-items:center; justify-content: center; padding: 20px; }
+.focus-card { background: var(--paper); border: 2px solid var(--ink); border-radius: 24px; padding: 30px 15px; width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 20px; position: relative; }
+.focus-actions { display: flex; gap: 10px; width: 100%; }
+.focus-nav-side { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; }
+.focus-nav-left { left: 16px; }
+.focus-nav-right { right: 16px; }
+.nav-btn { background: var(--paper); border: 2px solid var(--ink); border-radius: 50%; width: 56px; height: 56px; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.nav-btn:hover { background: var(--ink); color: var(--paper); }
+.nav-btn:disabled { opacity: 0.2; cursor: default; box-shadow: none; }
+.focus-top-bar { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; }
+.nav-counter { font-family: var(--mono); font-size: 0.75rem; color: var(--mid); }
+.focus-fav-btn { background: none; border: 1.5px solid var(--border); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.focus-fav-btn:hover { border-color: var(--accent); }
+
+#temp-qr { position: absolute; left: -9999px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:white; padding:10px 20px; border-radius:50px; font-size:0.75rem; z-index:3000; opacity:0; transition:0.3s; pointer-events:none; white-space: nowrap; }
+.toast.show { opacity:1; }
+
+/* ── Modal suppression ── */
+#del-modal { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:300; display:none; align-items:center; justify-content:center; }
+.del-modal-box { background:var(--paper); border:2px solid var(--ink); border-radius:20px; padding:28px 24px; max-width:340px; width:90%; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,0.18); }
+.del-modal-box h3 { font-size:1.1rem; font-weight:800; margin-bottom:8px; }
+.del-modal-box p { font-size:0.82rem; color:var(--mid); margin-bottom:20px; line-height:1.5; }
+.del-modal-actions { display:flex; flex-direction:column; gap:8px; }
+.del-btn-drive { background:var(--accent); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
+.del-btn-local { background:var(--ink); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
+.del-btn-cancel { background:none; color:var(--mid); border:1.5px solid var(--border); border-radius:10px; padding:11px; font-family:var(--sans); font-size:0.85rem; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"><span></span><span></span><span></span><span></span></div>
+    <h1>QR PRO</h1>
+  </div>
+  <nav>
+    <button class="tab active" onclick="switchView('create', this)">Créer</button>
+    <button class="tab" onclick="switchView('gallery', this)">Galerie <span class="badge" id="b-total">0</span></button>
+  </nav>
+</header>
+
+<div id="ocr-loader">
+  <div style="font-size:1.1rem; font-weight:800; margin-bottom:4px;">Analyse en cours…</div>
+  <div id="ocr-steps">
+    <div class="ocr-step" id="step-pre"><span class="ocr-step-dot"></span>Prétraitement de l'image</div>
+    <div class="ocr-step" id="step-ocr"><span class="ocr-step-dot"></span>Reconnaissance de texte</div>
+    <div class="ocr-step" id="step-clean"><span class="ocr-step-dot"></span>Nettoyage du résultat</div>
+  </div>
+  <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocr-bar"></div></div>
+  <div id="ocr-perc" style="font-family:var(--mono); font-size:0.8rem; color:#aaa;">0%</div>
+</div>
+
+<div id="crop-modal">
+  <div class="crop-container"><img id="image-to-crop"></div>
+  <div class="crop-controls">
+    <button onclick="closeCrop()" style="flex:1; padding:15px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700;">Annuler</button>
+    <button class="btn-main" style="flex:2" onclick="processAndOCR()">Analyser la zone</button>
+  </div>
+</div>
+
+<div id="temp-qr"></div>
+
+<main id="view-create" class="view active">
+  <div class="create-wrap">
+    <h2 style="font-size:1.8rem; font-weight:800;">Nouveau QR</h2>
+    <div class="field-group">
+      <label>Nom</label>
+      <input type="text" id="in-title" placeholder="Ex: WiFi maison">
+    </div>
+    
+    <div class="field-group">
+      <label>Dossier</label>
+      <select id="in-folder" style="padding:10px; border-radius:8px; font-size:14px;">
+        <option value="">Aucun dossier (Racine)</option>
+      </select>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <input type="text" id="new-folder-name" placeholder="Créer un nouveau dossier..." style="padding:8px; font-size:13px; border-radius:8px;">
+        <button class="ocr-trigger" onclick="createNewFolder()" style="align-self:auto; margin-bottom:0; padding:0 12px;">+ Ajouter</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <label>Contenu</label>
+        <button class="ocr-trigger" onclick="document.getElementById('ocr-input').click()">📷 Scanner Texte</button>
+      </div>
+      <input type="file" id="ocr-input" style="display:none" accept="image/*" onchange="openCropper(event)">
+      <textarea id="in-text" rows="5" placeholder="Saisir un lien, du texte, un identifiant…"></textarea>
+    </div>
+    <button class="btn-main" onclick="createNew()">
+      <span>Générer et Enregistrer</span>
+    </button>
+  </div>
+</main>
+
+<main id="view-gallery" class="view">
+  <div class="storage-bar-wrap">
+    <span class="storage-label">Stockage</span>
+    <div class="storage-bar"><div class="storage-fill" id="storage-fill"></div></div>
+    <span class="storage-label" id="storage-label">0%</span>
+  </div>
+  <div class="gallery-toolbar">
+    <input class="search-input" type="text" id="search-input" placeholder="🔍 Rechercher par titre…" oninput="render()">
+    <button class="filter-btn active" id="filter-all" onclick="setFilter('all', this)">Tous</button>
+    <button class="filter-btn" id="filter-fav" onclick="setFilter('fav', this)">⭐ Favoris</button>
+    
+    <select id="filter-folder" onchange="render()" style="font-family:var(--mono); font-size:0.7rem; font-weight:700; padding:8px 12px; border-radius:10px; border:1.5px solid var(--border); background:var(--paper); color:var(--mid); width:auto; outline:none;">
+      <option value="all">Tous les dossiers</option>
+      <option value="">Sans dossier</option>
+    </select>
+  </div>
+  <div class="io-toolbar">
+    <button class="io-btn" id="drive-btn" onclick="toggleDrive()" style="display:flex;align-items:center;justify-content:center;gap:6px">
+      <span id="drive-dot" style="width:8px;height:8px;border-radius:50%;background:#aaa;flex-shrink:0;transition:background 0.3s"></span>
+      <span id="drive-label">Drive</span>
+    </button>
+    <button class="io-btn" id="sync-btn" onclick="syncDrive()" style="display:flex;align-items:center;justify-content:center;gap:6px">
+      <span id="sync-icon">⟳</span> Synchroniser
+    </button>
+    <input type="file" id="import-input" style="display:none" accept=".json" onchange="importJSON(event)">
+  </div>
+  <div class="drag-hint" id="drag-hint">
+    <span class="drag-handle-icon">⠿</span> Glisse les cartes pour réorganiser
+  </div>
+  <div id="display-grid" class="gallery-grid"></div>
+</main>
+
+<div id="focus-mode" class="focus-overlay">
+  <button class="nav-btn focus-nav-side focus-nav-left" id="nav-prev" onclick="navigateFocus(-1)">←</button>
+  <button class="nav-btn focus-nav-side focus-nav-right" id="nav-next" onclick="navigateFocus(1)">→</button>
+  <div class="focus-card">
+    <div class="focus-top-bar">
+      <span class="nav-counter" id="nav-counter">1 / 1</span>
+      <button class="focus-fav-btn" id="focus-fav-btn" onclick="toggleFocusFav()" title="Favori">☆</button>
+    </div>
+    <h2 id="focus-title" style="font-size:1.3rem; font-weight:800; text-align:center;"></h2>
+    <div id="focus-qr-display" style="background:white; padding:10px; border-radius:10px;"></div>
+    <div class="focus-actions">
+      <button class="btn-main" style="flex:1; padding:14px;" onclick="downloadFocus()">⬇ Télécharger</button>
+      <button class="btn-main" style="flex:1; padding:14px; background:var(--mid);" onclick="closeFocus()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ─── État global ────────────────────────────────────────────────────────────
+let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
+// On récupère ou initialise la liste des dossiers
+let folders = JSON.parse(localStorage.getItem('qr_folders_v1') || '[]');
+let cropper;
+let focusImgSrc = '';
+let focusIdx = 0;
+let currentFilter = 'all';
+const STORAGE_LIMIT_KB = 3500;
+
+// ─── Gestion simplifiée des dossiers ─────────────────────────────────────────
+function createNewFolder() {
+  const input = document.getElementById('new-folder-name');
+  const name = input.value.trim();
+  if (!name) return showToast('Indiquez un nom de dossier');
+  if (folders.includes(name)) return showToast('Ce dossier existe déjà');
+  
+  folders.push(name);
+  localStorage.setItem('qr_folders_v1', JSON.stringify(folders));
+  input.value = '';
+  updateFolderDropdowns();
+  showToast(`✓ Dossier "${name}" créé`);
+}
+
+function updateFolderDropdowns() {
+  const inFolder = document.getElementById('in-folder');
+  const filterFolder = document.getElementById('filter-folder');
+  
+  const savedInVal = inFolder.value;
+  const savedFilterVal = filterFolder.value;
+
+  inFolder.innerHTML = '<option value="">Aucun dossier (Racine)</option>';
+  filterFolder.innerHTML = '<option value="all">Tous les dossiers</option><option value="">Sans dossier</option>';
+
+  folders.forEach(f => {
+    inFolder.innerHTML += `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`;
+    filterFolder.innerHTML += `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`;
+  });
+
+  inFolder.value = savedInVal;
+  filterFolder.value = savedFilterVal;
+}
+
+function moveItemToFolder(realIdx, folderName) {
+  items[realIdx].folder = folderName;
+  saveItems();
+  render();
+  showToast('✓ QR déplacé avec succès');
+}
+
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
+let dragSrcIdx = null;   // index dans items[] de la carte en cours de drag
+let dragOverIdx = null;  // index dans items[] de la carte survolée
+
+function initDragHint() {
+  const hint = document.getElementById('drag-hint');
+  if (hint) hint.classList.toggle('visible', items.length >= 2);
+}
+
+function addDragEvents(card, realIdx) {
+  // ── Desktop (HTML5 Drag API) ───────────────────────────────────────────
+  card.setAttribute('draggable', 'true');
+
+  card.addEventListener('dragstart', (e) => {
+    if (e.target.tagName === 'SELECT') { e.preventDefault(); return; }
+    dragSrcIdx = realIdx;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+    if (dragSrcIdx !== null && dragOverIdx !== null && dragSrcIdx !== dragOverIdx) {
+      reorder(dragSrcIdx, dragOverIdx);
+    }
+    dragSrcIdx = null;
+    dragOverIdx = null;
+  });
+
+  card.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (realIdx !== dragSrcIdx) {
+      document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+      dragOverIdx = realIdx;
+    }
+  });
+
+  card.addEventListener('dragleave', () => {
+    card.classList.remove('drag-over');
+  });
+
+  card.addEventListener('drop', (e) => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+  });
+
+  // ── Mobile (Touch API) ────────────────────────────────────────────────
+  let touchStartX, touchStartY, touchClone, touchMoved = false;
+
+  card.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.del-btn, .fav-btn, .folder-card-select')) return;
+    touchMoved = false;
+    dragSrcIdx = realIdx;
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+
+    touchClone = card.cloneNode(true);
+    touchClone.style.cssText = `
+      position: fixed;
+      width: ${card.offsetWidth}px;
+      left: ${card.getBoundingClientRect().left}px;
+      top: ${card.getBoundingClientRect().top}px;
+      opacity: 0.85;
+      border: 2px dashed var(--accent);
+      pointer-events: none;
+      z-index: 9999;
+      border-radius: 10px;
+      transform: scale(1.05);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+      transition: none;
+    `;
+    document.body.appendChild(touchClone);
+    card.style.opacity = '0.3';
+  }, { passive: true });
+
+  card.addEventListener('touchmove', (e) => {
+    if (dragSrcIdx === null || !touchClone) return;
+    touchMoved = true;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    touchClone.style.left = (card.getBoundingClientRect().left + dx) + 'px';
+    touchClone.style.top = (card.getBoundingClientRect().top + dy) + 'px';
+
+    touchClone.style.display = 'none';
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchClone.style.display = '';
+    const targetCard = el ? el.closest('.qr-card') : null;
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+    if (targetCard && targetCard !== card) {
+      targetCard.classList.add('drag-over');
+      dragOverIdx = parseInt(targetCard.dataset.realidx);
+    } else {
+      dragOverIdx = null;
+    }
+  }, { passive: false });
+
+  card.addEventListener('touchend', () => {
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    card.style.opacity = '';
+    document.querySelectorAll('.qr-card').forEach(c => c.classList.remove('drag-over'));
+
+    if (touchMoved && dragSrcIdx !== null && dragOverIdx !== null && dragSrcIdx !== dragOverIdx) {
+      reorder(dragSrcIdx, dragOverIdx);
+    } else if (!touchMoved && dragSrcIdx !== null) {
+      openFocus(dragSrcIdx);
+    }
+    dragSrcIdx = null;
+    dragOverIdx = null;
+    touchMoved = false;
+  });
+}
+
+function reorder(fromIdx, toIdx) {
+  const moved = items.splice(fromIdx, 1)[0];
+  items.splice(toIdx, 0, moved);
+  saveItems();
+  render();
+  showToast('✓ Ordre mis à jour');
+}
+
+// ─── Navigation ────────────────────────────────────────────────────────────
+function switchView(v, btn) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  btn.classList.add('active');
+  if (v === 'gallery') render();
+}
+
+// ─── Filtre galerie ─────────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function getFilteredItems() {
+  const query = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const folderFilter = document.getElementById('filter-folder')?.value || 'all';
+
+  return items
+    .map((item, idx) => ({ item, idx }))
+    .filter(({ item }) => {
+      const matchFilter = currentFilter === 'fav' ? item.fav : true;
+      const matchSearch = query ? item.title.toLowerCase().includes(query) : true;
+      
+      // Filtre dossier
+      let matchFolder = true;
+      if (folderFilter !== 'all') {
+        matchFolder = (item.folder || '') === folderFilter;
+      }
+      
+      return matchFilter && matchSearch && matchFolder;
+    });
+}
+
+// ─── OCR ───────────────────────────────────────────────────────────────────
+function openCropper(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('image-to-crop');
+    img.src = e.target.result;
+    document.getElementById('crop-modal').style.display = 'flex';
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(img, { viewMode: 1 });
+  };
+  reader.readAsDataURL(file);
+}
+
+async function processAndOCR() {
+  if (!cropper) return;
+  const loader = document.getElementById('ocr-loader');
+  loader.style.display = 'flex';
+  setOCRStep('pre');
+  try {
+    const rawCanvas = cropper.getCroppedCanvas({ maxWidth: 2000, maxHeight: 2000 });
+    const oc = document.createElement('canvas');
+    oc.width = rawCanvas.width; oc.height = rawCanvas.height;
+    const ctx = oc.getContext('2d');
+    ctx.drawImage(rawCanvas, 0, 0);
+    const imageData = ctx.getImageData(0, 0, oc.width, oc.height);
+    const d = imageData.data;
+    let total = 0;
+    for (let i = 0; i < d.length; i += 4) total += 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    const avgLum = total / (d.length / 4);
+    const threshold = avgLum * 0.85;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      const val = lum > threshold ? 255 : 0;
+      d[i] = d[i+1] = d[i+2] = val; d[i+3] = 255;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    const scaled = document.createElement('canvas');
+    scaled.width = oc.width * 2; scaled.height = oc.height * 2;
+    const sCtx = scaled.getContext('2d');
+    sCtx.imageSmoothingEnabled = false;
+    sCtx.drawImage(oc, 0, 0, scaled.width, scaled.height);
+    const blob = await new Promise(res => scaled.toBlob(res, 'image/png'));
+    closeCrop();
+    setOCRStep('ocr');
+    const result = await Tesseract.recognize(blob, 'fra+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const pct = Math.round(m.progress * 100);
+          document.getElementById('ocr-perc').innerText = pct + '%';
+          document.getElementById('ocr-bar').style.width = pct + '%';
+        }
+      }
+    });
+    setOCRStep('clean');
+    await sleep(300);
+    const raw = result.data.text || '';
+    const cleaned = raw.replace(/[^\S\n]+/g,' ').replace(/\n{3,}/g,'\n\n').replace(/[^\x20-\x7E\xC0-\xFF\n]/g,'').trim();
+    document.getElementById('in-text').value = cleaned || '';
+    showToast(cleaned ? '✓ Texte extrait !' : '⚠ Aucun texte détecté');
+  } catch(e) {
+    console.error(e);
+    showToast('Erreur lors de l\'analyse');
+  }
+  loader.style.display = 'none';
+  resetOCRSteps();
+}
+
+function setOCRStep(stepId) {
+  const steps = { pre:'step-pre', ocr:'step-ocr', clean:'step-clean' };
+  const order = ['pre','ocr','clean'];
+  const idx = order.indexOf(stepId);
+  order.forEach((s, i) => {
+    const el = document.getElementById(steps[s]);
+    el.classList.remove('active','done');
+    if (i < idx) el.classList.add('done');
+    else if (i === idx) el.classList.add('active');
+  });
+}
+function resetOCRSteps() {
+  ['step-pre','step-ocr','step-clean'].forEach(id => document.getElementById(id).classList.remove('active','done'));
+  document.getElementById('ocr-bar').style.width = '0%';
+  document.getElementById('ocr-perc').innerText = '0%';
+}
+function closeCrop() {
+  document.getElementById('crop-modal').style.display = 'none';
+  if (cropper) cropper.destroy();
+  document.getElementById('ocr-input').value = '';
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── Création QR ─────────────────────────────────────────────────────────────
+function createNew() {
+  const t = document.getElementById('in-title').value.trim();
+  const txt = document.getElementById('in-text').value.trim();
+  const folder = document.getElementById('in-folder').value;
+  if (!t || !txt) return showToast('Remplis les deux champs');
+  if (getStorageUsageKB() > STORAGE_LIMIT_KB) return showToast('⚠ Stockage plein — supprime des QR codes');
+  const tempArea = document.getElementById('temp-qr');
+  tempArea.innerHTML = '';
+  new QRCode(tempArea, { text: txt, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
+  waitForQRCanvas(tempArea, (finalImg) => {
+    items.push({ id: Date.now(), title: t, img: finalImg, text: txt, folder: folder });
+    saveItems(); updateCount();
+    document.getElementById('in-title').value = '';
+    document.getElementById('in-text').value = '';
+    showToast('✓ QR Code créé !');
+  });
+}
+
+function waitForQRCanvas(container, callback, attempts = 0) {
+  if (attempts > 20) return showToast('Erreur de génération');
+  const canvas = container.querySelector('canvas');
+  if (canvas && canvas.width > 0) callback(canvas.toDataURL('image/png'));
+  else requestAnimationFrame(() => waitForQRCanvas(container, callback, attempts + 1));
+}
+
+// ─── Sauvegarde ───────────────────────────────────────────────────────────────
+function saveItems() {
+  try { localStorage.setItem('qr_items_v1', JSON.stringify(items)); }
+  catch(e) { showToast('⚠ Stockage insuffisant'); }
+}
+function getStorageUsageKB() {
+  try { return Math.round(((localStorage.getItem('qr_items_v1') || '').length * 2) / 1024); }
+  catch { return 0; }
+}
+
+// ─── Galerie ─────────────────────────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById('display-grid');
+  const filtered = getFilteredItems();
+  initDragHint();
+
+  if (filtered.length === 0) {
+    const msg = currentFilter === 'fav' ? 'Aucun favori pour l\'instant ⭐' : 'Aucun QR code trouvé';
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px 20px; color:var(--mid); font-size:0.85rem; font-family:var(--mono);">${msg}</div>`;
+    updateStorageBar();
+    return;
+  }
+
+  grid.innerHTML = '';
+
+  filtered.forEach(({ item, idx: realIdx }) => {
+    const card = document.createElement('div');
+    card.className = 'qr-card' + (item.fav ? ' is-fav' : '');
+    card.dataset.realidx = realIdx;
+
+    // Options du sélecteur de dossier pour reclasser le QR existant
+    let optionsHtml = '<option value="">📁 (Racine)</option>';
+    folders.forEach(f => {
+      optionsHtml += `<option value="${escapeHtml(f)}" ${item.folder === f ? 'selected' : ''}>📁 ${escapeHtml(f)}</option>`;
+    });
+
+    card.innerHTML = `
+      <button class="fav-btn" title="Favori">${item.fav ? '⭐' : '☆'}</button>
+      <button class="del-btn" title="Supprimer">✕</button>
+      <img src="${item.img}" alt="QR ${escapeHtml(item.title)}">
+      <p style="font-size:0.7rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.title)}</p>
+      <select class="folder-card-select" title="Déplacer vers un dossier">
+        ${optionsHtml}
+      </select>
+    `;
+
+    // Événement : Changement de dossier pour le QR existant
+    card.querySelector('.folder-card-select').addEventListener('change', (e) => {
+      moveItemToFolder(realIdx, e.target.value);
+    });
+
+    // Bouton favori
+    card.querySelector('.fav-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      items[realIdx].fav = !items[realIdx].fav;
+      saveItems(); render();
+      showToast(items[realIdx].fav ? '⭐ Ajouté aux favoris' : 'Retiré des favoris');
+    });
+
+    // Bouton supprimer relié à votre modal existant
+    card.querySelector('.del-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      showDeleteModal(realIdx);
+    });
+
+    // Clic pour ouvrir le focus (desktop seulement — le touch est géré dans addDragEvents)
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.del-btn, .fav-btn, .folder-card-select')) return;
+      openFocus(realIdx);
+    });
+
+    // Drag & Drop
+    addDragEvents(card, realIdx);
+
+    grid.appendChild(card);
+  });
+
+  updateStorageBar();
+}
+
+function updateStorageBar() {
+  const usedKB = getStorageUsageKB();
+  const pct = Math.min(100, Math.round((usedKB / STORAGE_LIMIT_KB) * 100));
+  document.getElementById('storage-fill').style.width = pct + '%';
+  document.getElementById('storage-fill').style.background = pct > 80 ? '#e53e3e' : 'var(--accent)';
+  document.getElementById('storage-label').innerText = `${usedKB} Ko / ${STORAGE_LIMIT_KB} Ko`;
+}
+
+// ─── Focus ────────────────────────────────────────────────────────────────────
+function openFocus(idx) {
+  const item = items[idx];
+  if (!item) return;
+  focusIdx = idx;
+  renderFocus();
+  document.getElementById('focus-mode').style.display = 'flex';
+}
+
+function renderFocus() {
+  const filtered = getFilteredItems();
+  const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
+  const item = items[focusIdx];
+  if (!item) return;
+  focusImgSrc = item.img;
+  document.getElementById('focus-title').innerText = item.title;
+  document.getElementById('focus-qr-display').innerHTML = `<img src="${item.img}" style="width:200px; display:block;">`;
+  const total = filtered.length || items.length;
+  const pos = posInFiltered >= 0 ? posInFiltered + 1 : '?';
+  document.getElementById('nav-counter').innerText = `${pos} / ${total}`;
+  document.getElementById('nav-prev').disabled = posInFiltered <= 0;
+  document.getElementById('nav-next').disabled = posInFiltered >= filtered.length - 1;
+  document.getElementById('focus-fav-btn').innerText = item.fav ? '⭐' : '☆';
+}
+
+function navigateFocus(dir) {
+  const filtered = getFilteredItems();
+  const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
+  const newPos = posInFiltered + dir;
+  if (newPos < 0 || newPos >= filtered.length) return;
+  focusIdx = filtered[newPos].idx;
+  renderFocus();
+}
+
+function toggleFocusFav() {
+  items[focusIdx].fav = !items[focusIdx].fav;
+  saveItems(); renderFocus(); render();
+  showToast(items[focusIdx].fav ? '⭐ Ajouté aux favoris' : 'Retiré des favoris');
+}
+function closeFocus() { document.getElementById('focus-mode').style.display = 'none'; }
+function downloadFocus() {
+  if (!focusImgSrc) return;
+  const a = document.createElement('a');
+  a.href = focusImgSrc; a.download = 'qrcode.png'; a.click();
+  showToast('Téléchargement lancé');
+}
+
+// ─── Google Drive + Synchronisation ──────────────────────────────────────────
+const DRIVE_CLIENT_ID = '510292526417-007bs9oh8tdif3hgkr4ov33ns7ctl5kq.apps.googleusercontent.com';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILE_NAME = 'qr-pro-backup.json';
+let driveToken = null;
+let driveFileId = null;
+let driveTokenClient = null;
+let driveSyncPending = false;
+
+window.addEventListener('load', () => {
+  // Initialise l'affichage des dossiers au lancement
+  updateFolderDropdowns();
+
+  const wait = setInterval(() => {
+    if (window.google && google.accounts) {
+      clearInterval(wait);
+      driveTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: DRIVE_CLIENT_ID,
+        scope: DRIVE_SCOPES,
+        callback: onDriveToken,
+      });
+      const saved = sessionStorage.getItem('qrpro_token');
+      if (saved) { driveToken = saved; setDriveUI(true); }
+      else setDriveUI(false);
+    }
+  }, 200);
+});
+
+function onDriveToken(resp) {
+  if (resp.error) { showToast('Connexion annulée'); setDriveUI(false); return; }
+  driveToken = resp.access_token;
+  sessionStorage.setItem('qrpro_token', driveToken);
+  setDriveUI(true);
+  showToast('✓ Connecté à Google Drive');
+  if (driveSyncPending) { driveSyncPending = false; syncDrive(); }
+}
+
+function setDriveUI(connected) {
+  const dot = document.getElementById('drive-dot');
+  const label = document.getElementById('drive-label');
+  if (!dot) return;
+  dot.style.background = connected ? '#6FCF97' : '#aaa';
+  label.textContent = connected ? 'Drive connecté' : 'Drive';
+}
+
+function toggleDrive() {
+  if (driveToken) {
+    google.accounts.oauth2.revoke(driveToken, () => {});
+    driveToken = null; driveFileId = null;
+    sessionStorage.removeItem('qrpro_token');
+    setDriveUI(false);
+    showToast('Déconnecté de Drive');
+  } else {
+    if (!driveTokenClient) { showToast('Google en chargement…'); return; }
+    driveTokenClient.requestAccessToken();
+  }
+}
+
+async function driveReq(url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { 'Authorization': 'Bearer ' + driveToken, ...(opts.headers||{}) } });
+  if (r.status === 401) {
+    driveToken = null; sessionStorage.removeItem('qrpro_token'); setDriveUI(false);
+    throw new Error('Token expiré — reconnecte-toi');
+  }
+  return r;
+}
+
+async function findDriveFile() {
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+  const r = await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const d = await r.json();
+  return d.files && d.files.length ? d.files[0].id : null;
+}
+
+async function writeToDrive(data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  if (!driveFileId) driveFileId = await findDriveFile();
+  if (driveFileId) {
+    await driveReq(
+      `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+      { method: 'PATCH', body: blob, headers: { 'Content-Type': 'application/json' } }
+    );
+  } else {
+    const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+    form.append('file', blob);
+    const r = await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', body: form });
+    const d = await r.json();
+    driveFileId = d.id;
+  }
+}
+
+async function syncDrive() {
+  if (!driveToken) {
+    driveSyncPending = true;
+    if (!driveTokenClient) { showToast('Google en chargement…'); return; }
+    driveTokenClient.requestAccessToken();
+    return;
+  }
+
+  setSyncUI(true);
+  try {
+    if (!driveFileId) driveFileId = await findDriveFile();
+    let driveItems = [];
+    if (driveFileId) {
+      const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+      const data = await r.json();
+      driveItems = Array.isArray(data) ? data : [];
+    }
+
+    const localIds = new Set(items.map(i => i.id));
+    const driveIds = new Set(driveItems.map(i => i.id));
+
+    const onlyOnDrive = driveItems.filter(i => !localIds.has(i.id));   
+    const onlyOnLocal = items.filter(i => !driveIds.has(i.id));        
+
+    const merged = [...items, ...onlyOnDrive]; 
+
+    let msg = '';
+    if (onlyOnDrive.length === 0 && onlyOnLocal.length === 0) {
+      msg = '✓ Déjà synchronisé — rien à faire';
+    } else {
+      const parts = [];
+      if (onlyOnDrive.length) parts.push(`+${onlyOnDrive.length} chargé(s) depuis Drive`);
+      if (onlyOnLocal.length) parts.push(`+${onlyOnLocal.length} envoyé(s) vers Drive`);
+      msg = '✓ ' + parts.join(' · ');
+    }
+
+    items = merged;
+    saveItems();
+    updateCount();
+    render();
+
+    await writeToDrive(merged);
+
+    showToast(msg);
+  } catch(e) {
+    showToast('Erreur sync : ' + e.message);
+  }
+  setSyncUI(false);
+}
+
+function setSyncUI(loading) {
+  const btn = document.getElementById('sync-btn');
+  const icon = document.getElementById('sync-icon');
+  if (!btn) return;
+  if (loading) {
+    btn.disabled = true;
+    icon.style.display = 'inline-block';
+    icon.style.animation = 'spin 0.8s linear infinite';
+  } else {
+    btn.disabled = false;
+    icon.style.animation = '';
+  }
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) return showToast('⚠ Fichier invalide');
+      const existingIds = new Set(items.map(i => i.id));
+      const newItems = data.filter(i => i.id && i.title && i.img && !existingIds.has(i.id));
+      items = [...newItems, ...items];
+      saveItems(); updateCount(); render();
+      showToast(`✓ ${newItems.length} QR importé(s)`);
+    } catch { showToast('⚠ Fichier JSON invalide'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+
+// ─── Suppression définitive ──────────────────────────────────────────────────
+let pendingDeleteIdx = null;
+
+function showDeleteModal(idx) {
+  pendingDeleteIdx = idx;
+  const title = items[idx] ? items[idx].title : '';
+  document.getElementById('del-modal-title').textContent = `Supprimer "${title}" ?`;
+  document.getElementById('del-modal').style.display = 'flex';
+}
+function closeDeleteModal() {
+  document.getElementById('del-modal').style.display = 'none';
+  pendingDeleteIdx = null;
+}
+async function confirmDelete(alsoFromDrive) {
+  if (pendingDeleteIdx === null) return;
+  const idx = pendingDeleteIdx;
+  closeDeleteModal();
+
+  if (alsoFromDrive && driveToken) {
+    try {
+      if (!driveFileId) driveFileId = await findDriveFile();
+      if (driveFileId) {
+        const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+        let driveItems = await r.json();
+        if (Array.isArray(driveItems)) {
+          const removedId = items[idx].id;
+          driveItems = driveItems.filter(i => i.id !== removedId);
+          await writeToDrive(driveItems);
+        }
+      }
+      showToast('✓ Supprimé localement et sur Drive');
+    } catch(e) {
+      showToast('Supprimé localement — erreur Drive : ' + e.message);
+    }
+  } else if (alsoFromDrive && !driveToken) {
+    showToast('Supprimé localement — connecte Drive pour supprimer aussi du Drive');
+  } else {
+    showToast('✓ QR supprimé localement');
+  }
+
+  items.splice(idx, 1);
+  saveItems(); updateCount(); render();
+}
+
+// ─── Utilitaires ─────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function updateCount() {
+  document.getElementById('b-total').innerText = items.length;
+}
+function showToast(m) {
+  const t = document.getElementById('toast');
+  t.innerText = m; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+updateCount();
+</script>
+<div id="del-modal">
+  <div class="del-modal-box">
+    <h3 id="del-modal-title">Supprimer ce QR ?</h3>
+    <p>Veux-tu aussi le supprimer de Google Drive ?</p>
+    <div class="del-modal-actions">
+      <button class="del-btn-drive" onclick="confirmDelete(true)">🗑 Supprimer partout (local + Drive)</button>
+      <button class="del-btn-local" onclick="confirmDelete(false)">Supprimer uniquement en local</button>
+      <button class="del-btn-cancel" onclick="closeDeleteModal()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
