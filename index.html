@@ -62,15 +62,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .crop-container { flex: 1; position: relative; overflow: hidden; }
 .crop-controls { padding: 20px; background: var(--paper); display: flex; gap: 10px; }
 
-/* ── Live QR Scanner Modal avec contrôles de taille ── */
+/* ── Live QR Scanner Modal ── */
 #scanner-modal { position: fixed; inset: 0; background: #000; z-index: 1500; display: none; flex-direction: column; }
-.scanner-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+.scanner-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; touch-action: none; }
 #camera-preview { width: 100%; height: 100%; object-fit: cover; }
 .scanner-controls { padding: 15px 20px; background: var(--paper); display: flex; flex-direction: column; gap: 12px; border-top: 2px solid var(--ink); }
-.scanner-slider-group { display: flex; flex-direction: column; gap: 4px; }
-.scanner-slider-header { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.75rem; color: var(--mid); font-weight: bold; }
-.scanner-slider { width: 100%; height: 8px; background: var(--border); border-radius: 4px; outline: none; -webkit-appearance: none; appearance: none; }
-.scanner-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--ink); }
+.scanner-hint { font-family: var(--mono); font-size: 0.75rem; color: var(--mid); text-align: center; font-weight: bold; }
 
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 15px; }
 
@@ -199,16 +196,12 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 </div>
 
 <div id="scanner-modal">
-  <div class="scanner-container">
+  <div class="scanner-container" id="scanner-touch-zone">
     <div id="camera-preview"></div>
   </div>
   <div class="scanner-controls">
-    <div class="scanner-slider-group">
-      <div class="scanner-slider-header">
-        <span>Taille du viseur :</span>
-        <span id="scanner-size-val">40%</span>
-      </div>
-      <input type="range" id="scanner-size-slider" class="scanner-slider" min="15" max="85" value="40" oninput="updateScannerSize(this.value)">
+    <div class="scanner-hint">
+      Pincez ou écartez 2 doigts sur l'écran pour ajuster la visée
     </div>
     <button onclick="stopLiveScanner()" style="padding:14px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700; cursor:pointer; width:100%;">Annuler</button>
   </div>
@@ -332,7 +325,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 let items = JSON.parse(localStorage.getItem('qr_items_v1') || '[]');
 let cropper;
 let liveScannerInstance = null;
-let currentScannerSizePercent = 40; // Taille initiale (40% de l'écran)
+let currentScannerSizePercent = 35; // Taille de départ par défaut modérée (35%)
 let focusImgSrc = '';
 let focusIdx = 0;
 let currentFilter = 'all';
@@ -681,20 +674,18 @@ function closeCrop() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 
-// ─── Scanner de QR en direct (Dynamique & Précis) ────────────────────────────
+// ─── Scanner Live Tactile (Pinch-to-Resize la Zone) ─────────────────────────
+let startTouchDist = 0;
+let startSizePercent = 35;
+
 function startLiveScanner() {
   document.getElementById('scanner-modal').style.display = 'flex';
   
-  // Remettre la valeur initiale dans le curseur de contrôle
-  currentScannerSizePercent = 40;
-  document.getElementById('scanner-size-slider').value = currentScannerSizePercent;
-  document.getElementById('scanner-size-val').innerText = currentScannerSizePercent + "%";
-  
+  currentScannerSizePercent = 35; // Remet à 35% à chaque ouverture
   liveScannerInstance = new Html5Qrcode("camera-preview");
   
   const qrCodeSuccessCallback = (decodedText, decodedResult) => {
     document.getElementById('in-text').value = decodedText;
-    
     if(decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
       try {
         const urlObj = new URL(decodedText);
@@ -705,15 +696,12 @@ function startLiveScanner() {
     } else {
       document.getElementById('in-title').value = "QR Scanné";
     }
-    
     showToast("✓ Code lu avec succès !");
     stopLiveScanner();
   };
   
-  // Fonction de calcul de la zone de visée dynamique selon le curseur
   const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-    // Convertit le pourcentage choisi par l'utilisateur en pixels de visée
     const size = Math.round(minEdge * (currentScannerSizePercent / 100));
     return { width: size, height: size };
   };
@@ -721,6 +709,10 @@ function startLiveScanner() {
   const config = { fps: 12, qrbox: qrboxFunction };
   
   liveScannerInstance.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+    .then(() => {
+      // Une fois démarré, on attache les événements tactiles sur la zone
+      initScannerTouchControls();
+    })
     .catch(err => {
       console.error("Erreur de caméra: ", err);
       showToast("⚠ Impossible d'accéder à la caméra");
@@ -728,19 +720,61 @@ function startLiveScanner() {
     });
 }
 
-// Permet de rafraîchir en direct le cadre de visée sans couper la caméra
-function updateScannerSize(newVal) {
-  currentScannerSizePercent = parseInt(newVal);
-  document.getElementById('scanner-size-val').innerText = currentScannerSizePercent + "%";
-  
-  // Si le scanner tourne, on lui applique dynamiquement le nouveau cadre
-  if (liveScannerInstance && liveScannerInstance.isScanning) {
-    liveScannerInstance.applyVideoConstraints({}).catch(() => {});
+function initScannerTouchControls() {
+  const touchZone = document.getElementById('scanner-touch-zone');
+  if (!touchZone) return;
+
+  // Supprime d'éventuels anciens écouteurs pour éviter les doublons
+  touchZone.removeEventListener('touchstart', handleScannerTouchStart);
+  touchZone.removeEventListener('touchmove', handleScannerTouchMove);
+
+  touchZone.addEventListener('touchstart', handleScannerTouchStart, { passive: true });
+  touchZone.addEventListener('touchmove', handleScannerTouchMove, { passive: false });
+}
+
+function handleScannerTouchStart(e) {
+  if (e.touches.length === 2) {
+    // Calcul de la distance initiale entre les deux doigts
+    startTouchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    startSizePercent = currentScannerSizePercent;
+  }
+}
+
+function handleScannerTouchMove(e) {
+  if (e.touches.length === 2 && startTouchDist > 0) {
+    e.preventDefault(); // Bloque le défilement de page pendant le zoom
+    
+    // Nouvelle distance entre les doigts
+    const currentDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    
+    // Facteur d'échelle basé sur l'écartement des doigts
+    const factor = currentDist / startTouchDist;
+    
+    // Nouvelle taille calculée (restreinte entre 12% et 85%)
+    let newSize = Math.round(startSizePercent * factor);
+    if (newSize < 12) newSize = 12;
+    if (newSize > 85) newSize = 85;
+    
+    if (newSize !== currentScannerSizePercent) {
+      currentScannerSizePercent = newSize;
+      
+      // Force le scanner à appliquer immédiatement la nouvelle dimension calculée
+      if (liveScannerInstance && liveScannerInstance.isScanning) {
+        liveScannerInstance.applyVideoConstraints({}).catch(() => {});
+      }
+    }
   }
 }
 
 function stopLiveScanner() {
   document.getElementById('scanner-modal').style.display = 'none';
+  startTouchDist = 0;
   if (liveScannerInstance) {
     liveScannerInstance.stop().then(() => {
       liveScannerInstance.clear();
@@ -978,43 +1012,6 @@ function cancelFocusEditMode() {
   renderFocus();
 }
 
-function saveFocusModifications() {
-  const newTitle = document.getElementById('edit-focus-title').value.trim();
-  const newText = document.getElementById('edit-focus-text').value.trim();
-  const newFolder = document.getElementById('edit-focus-folder').value;
-
-  if(!newTitle || !newText) return showToast("Ne laissez pas de champs vides");
-
-  const tempArea = document.getElementById('temp-qr');
-  tempArea.innerHTML = '';
-  new QRCode(tempArea, { text: newText, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
-  
-  waitForQRCanvas(tempArea, (finalImg) => {
-    items[focusIdx].title = newTitle;
-    items[focusIdx].text = newText;
-    items[focusIdx].img = finalImg;
-    items[focusIdx].folderId = newFolder ? parseInt(newFolder) : null;
-    
-    saveItems();
-    showToast("✓ Modifications enregistrées !");
-    cancelFocusEditMode();
-    closeFocus();
-    render();
-  });
-}
-
-function navigateFocus(dir) {
-  if (isFocusEditing) return;
-  const filtered = getFilteredItems().filter(f => f.item.type === 'qr');
-  const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
-  const newPos = posInFiltered + dir;
-  if (newPos < 0 || newPos >= filtered.length) return;
-  focusIdx = filtered[newPos].idx;
-  
-  document.getElementById('focus-decoded-box').style.display = "none";
-  renderFocus();
-}
-
 // ─── Cloud & Backup ─────────────────────────────────────────────────────────
 const DRIVE_CLIENT_ID = '510292526417-007bs9oh8tdif3hgkr4ov33ns7ctl5kq.apps.googleusercontent.com';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -1166,6 +1163,43 @@ function importJSON(event) {
     } catch { showToast('⚠ Fichier JSON invalide'); }
   };
   reader.readAsText(file); event.target.value = '';
+}
+
+function saveFocusModifications() {
+  const newTitle = document.getElementById('edit-focus-title').value.trim();
+  const newText = document.getElementById('edit-focus-text').value.trim();
+  const newFolder = document.getElementById('edit-focus-folder').value;
+
+  if(!newTitle || !newText) return showToast("Ne laissez pas de champs vides");
+
+  const tempArea = document.getElementById('temp-qr');
+  tempArea.innerHTML = '';
+  new QRCode(tempArea, { text: newText, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.H });
+  
+  waitForQRCanvas(tempArea, (finalImg) => {
+    items[focusIdx].title = newTitle;
+    items[focusIdx].text = newText;
+    items[focusIdx].img = finalImg;
+    items[focusIdx].folderId = newFolder ? parseInt(newFolder) : null;
+    
+    saveItems();
+    showToast("✓ Modifications enregistrées !");
+    cancelFocusEditMode();
+    closeFocus();
+    render();
+  });
+}
+
+function navigateFocus(dir) {
+  if (isFocusEditing) return;
+  const filtered = getFilteredItems().filter(f => f.item.type === 'qr');
+  const posInFiltered = filtered.findIndex(f => f.idx === focusIdx);
+  const newPos = posInFiltered + dir;
+  if (newPos < 0 || newPos >= filtered.length) return;
+  focusIdx = filtered[newPos].idx;
+  
+  document.getElementById('focus-decoded-box').style.display = "none";
+  renderFocus();
 }
 
 // ─── Suppression ────────────────────────────────────────────────────────────
