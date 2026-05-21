@@ -43,8 +43,59 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 /* Styles du Scanner Caméra Externe */
 #camera-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1500; display: none; flex-direction: column; color: white; }
-.camera-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 10px; }
-#camera-reader { width: 100%; max-width: 450px; background: #000; border-radius: 12px; overflow: hidden; }
+.camera-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 10px; overflow: hidden; }
+#camera-reader { width: 100%; max-width: 480px; background: #000; border-radius: 12px; overflow: hidden; position: relative; }
+
+/* Zone de scan redimensionnable par les doigts */
+#scan-zone-overlay {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 10;
+  border: 2.5px solid rgba(255,255,255,0.0);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+  border-radius: 10px;
+  transition: width 0.15s, height 0.15s;
+}
+/* Coins lumineux du cadre */
+#scan-zone-overlay::before, #scan-zone-overlay::after {
+  content: '';
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: #fff;
+  border-style: solid;
+}
+#scan-zone-overlay::before { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+#scan-zone-overlay::after  { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+
+.scan-corner-tr, .scan-corner-bl {
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: #fff;
+  border-style: solid;
+}
+.scan-corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+.scan-corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+
+/* Poignée de resize (coin bas-droit) */
+#scan-resize-handle {
+  position: absolute;
+  bottom: -14px; right: -14px;
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: nwse-resize;
+  pointer-events: all;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  touch-action: none;
+  z-index: 20;
+  font-size: 14px;
+  color: white;
+  border: 2px solid rgba(255,255,255,0.4);
+}
+
 .camera-controls { padding: 20px; background: var(--paper); display: flex; flex-direction: column; gap: 15px; color: var(--ink); }
 .range-container { display: flex; flex-direction: column; gap: 6px; }
 .range-container label { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; }
@@ -158,16 +209,23 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 
 <div id="camera-modal">
   <div class="camera-container">
-    <div style="font-size:1.1rem; font-weight:800; margin-bottom:15px; text-align:center;">Placer le QR Code dans le cadre</div>
-    <div id="camera-reader"></div>
+    <div style="font-size:1rem; font-weight:800; margin-bottom:12px; text-align:center; opacity:0.9;">Placer le code dans le cadre</div>
+    <div id="camera-reader" style="position:relative;">
+      <div id="scan-zone-overlay">
+        <div class="scan-corner-tr"></div>
+        <div class="scan-corner-bl"></div>
+        <div id="scan-resize-handle" title="Glisse pour redimensionner">⤡</div>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-family:var(--mono); font-size:0.7rem; opacity:0.55; text-align:center;">Glisse ⤡ pour ajuster la zone · <span id="scan-size-val">250px</span></div>
   </div>
   <div class="camera-controls">
     <div class="range-container">
       <label>
         <span>Taille de la zone de visée</span>
-        <span id="scan-size-val">250px</span>
+        <span id="scan-size-val2">250px</span>
       </label>
-      <input type="range" id="scan-size-input" min="150" max="350" value="250" step="10" oninput="adjustScanSize(this.value)">
+      <input type="range" id="scan-size-input" min="100" max="400" value="250" step="5" oninput="onSliderChange(this.value)">
     </div>
     <button onclick="closeCameraScanner()" style="padding:15px; border-radius:10px; border:none; background:#eee; font-family:var(--sans); font-weight:700; width:100%; cursor:pointer;">Annuler / Fermer</button>
   </div>
@@ -546,9 +604,84 @@ function getFilteredItems() {
 }
 
 // ─── Fonctions Scanner Caméra (Zone Ajustable) ───────────────────────────────────
+let scanResizeDebounce = null;
+
 function openCameraScanner() {
   document.getElementById('camera-modal').style.display = 'flex';
+  updateScanOverlaySize(currentScanSize);
   startHtml5Scanner(currentScanSize);
+  initScanResizeHandle();
+}
+
+function updateScanOverlaySize(size) {
+  const overlay = document.getElementById('scan-zone-overlay');
+  if (!overlay) return;
+  overlay.style.width  = size + 'px';
+  overlay.style.height = size + 'px';
+  document.getElementById('scan-size-val').innerText  = size + 'px';
+  const val2 = document.getElementById('scan-size-val2');
+  if (val2) val2.innerText = size + 'px';
+  const slider = document.getElementById('scan-size-input');
+  if (slider) slider.value = size;
+}
+
+function initScanResizeHandle() {
+  const handle = document.getElementById('scan-resize-handle');
+  const overlay = document.getElementById('scan-zone-overlay');
+  if (!handle || !overlay) return;
+
+  // Empêche d'attacher plusieurs fois
+  if (handle._resizeInited) return;
+  handle._resizeInited = true;
+
+  let startX, startY, startSize;
+
+  function onPointerDown(e) {
+    e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX;
+    startY = pt.clientY;
+    startSize = currentScanSize;
+    handle.style.background = '#c0521a';
+
+    document.addEventListener('mousemove', onPointerMove, { passive: false });
+    document.addEventListener('mouseup',   onPointerUp);
+    document.addEventListener('touchmove', onPointerMove, { passive: false });
+    document.addEventListener('touchend',  onPointerUp);
+  }
+
+  function onPointerMove(e) {
+    if (e.cancelable) e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    const dx = pt.clientX - startX;
+    const dy = pt.clientY - startY;
+    const delta = (Math.abs(dx) > Math.abs(dy)) ? dx : dy;
+    const newSize = Math.min(400, Math.max(100, Math.round(startSize + delta)));
+    currentScanSize = newSize;
+    updateScanOverlaySize(newSize);
+
+    // Relance avec debounce (300ms après arrêt du geste)
+    clearTimeout(scanResizeDebounce);
+    scanResizeDebounce = setTimeout(() => startHtml5Scanner(newSize), 300);
+  }
+
+  function onPointerUp() {
+    handle.style.background = 'var(--accent)';
+    document.removeEventListener('mousemove', onPointerMove);
+    document.removeEventListener('mouseup',   onPointerUp);
+    document.removeEventListener('touchmove', onPointerMove);
+    document.removeEventListener('touchend',  onPointerUp);
+  }
+
+  handle.addEventListener('mousedown',  onPointerDown);
+  handle.addEventListener('touchstart', onPointerDown, { passive: false });
+}
+
+function onSliderChange(val) {
+  currentScanSize = parseInt(val);
+  updateScanOverlaySize(currentScanSize);
+  clearTimeout(scanResizeDebounce);
+  scanResizeDebounce = setTimeout(() => startHtml5Scanner(currentScanSize), 350);
 }
 
 function startHtml5Scanner(qrboxSize) {
@@ -577,7 +710,7 @@ function initScannerConfig(qrboxSize) {
     (decodedText) => {
       document.getElementById('in-text').value = decodedText;
       if (navigator.vibrate) navigator.vibrate(50);
-      showToast("✓ Code QR détecté !");
+      showToast("✓ Code détecté !");
       closeCameraScanner();
     },
     (errorMessage) => {
@@ -591,16 +724,12 @@ function initScannerConfig(qrboxSize) {
 }
 
 function adjustScanSize(val) {
-  currentScanSize = val;
-  document.getElementById('scan-size-val').innerText = val + "px";
-  if (html5QrScannerInstance && html5QrScannerInstance.isScanning) {
-    // Relance dynamique du scanner avec la nouvelle taille sans fermer la modal
-    startHtml5Scanner(val);
-  }
+  onSliderChange(val);
 }
 
 function closeCameraScanner() {
   document.getElementById('camera-modal').style.display = 'none';
+  clearTimeout(scanResizeDebounce);
   if (html5QrScannerInstance) {
     html5QrScannerInstance.stop().catch(err => console.log(err));
   }
