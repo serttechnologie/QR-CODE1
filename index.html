@@ -181,6 +181,54 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 .del-btn-local { background:var(--ink); color:white; border:none; border-radius:10px; padding:13px; font-family:var(--sans); font-size:0.88rem; font-weight:700; cursor:pointer; }
 .del-btn-cancel { background:none; color:var(--mid); border:1.5px solid var(--border); border-radius:10px; padding:11px; font-family:var(--sans); font-size:0.85rem; cursor:pointer; }
 
+/* ── Notes Module ── */
+.notes-wrap { max-width: 600px; margin: 0 auto; padding: 20px 15px; display: flex; flex-direction: column; gap: 16px; }
+.notes-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.notes-search { font-family: var(--mono); font-size: 0.8rem; background: var(--paper); border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; flex: 1; min-width: 120px; outline: none; transition: border-color 0.2s; }
+.notes-search:focus { border-color: var(--accent); }
+
+/* Breadcrumb */
+.notes-path-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--paper); border: 1.5px dashed var(--border); border-radius: 10px; font-family: var(--mono); font-size: 0.8rem; }
+
+/* Folders list */
+.notes-folders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.notes-folder-card { background: var(--paper); border: 1.5px solid var(--border); border-left: 5px solid var(--folder-color); border-radius: 12px; padding: 14px 12px; cursor: pointer; position: relative; transition: border-color 0.2s, transform 0.2s; }
+.notes-folder-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+.notes-folder-card .folder-icon { font-size: 1.8rem; margin-bottom: 6px; }
+.notes-folder-card .folder-name { font-size: 0.9rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notes-folder-card .folder-meta { font-family: var(--mono); font-size: 0.65rem; color: var(--mid); margin-top: 3px; }
+.notes-folder-card .del-btn { position: absolute; top: -6px; right: -6px; background: #e53e3e; border: none; border-radius: 50%; width: 22px; height: 22px; color: white; font-size: 0.65rem; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 5; }
+body.mode-notes-edit .notes-folder-card .del-btn { display: flex; }
+
+/* Notes list inside folder */
+.notes-list { display: flex; flex-direction: column; gap: 10px; }
+.note-card { background: var(--paper); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; position: relative; transition: border-color 0.2s, transform 0.15s; }
+.note-card:hover { border-color: var(--ink); transform: translateY(-1px); }
+.note-card .note-title { font-size: 1rem; font-weight: 800; margin-bottom: 6px; }
+.note-card .note-desc { font-family: var(--mono); font-size: 0.78rem; color: var(--mid); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.note-card .note-date { font-family: var(--mono); font-size: 0.62rem; color: var(--border); margin-top: 8px; }
+.note-card .del-btn { position: absolute; top: -6px; right: -6px; background: #e53e3e; border: none; border-radius: 50%; width: 22px; height: 22px; color: white; font-size: 0.65rem; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 5; }
+body.mode-notes-edit .note-card .del-btn { display: flex; }
+
+/* Note overlay editor */
+#note-modal { position: fixed; inset: 0; background: rgba(245,242,235,0.98); backdrop-filter: blur(8px); z-index: 400; display: none; flex-direction: column; overflow-y: auto; padding: 20px 15px; }
+.note-modal-inner { max-width: 560px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.note-modal-header { display: flex; align-items: center; gap: 12px; }
+.note-modal-title { font-size: 1.3rem; font-weight: 800; flex: 1; }
+.btn-close-note { background: var(--bg); border: 1.5px solid var(--border); border-radius: 50%; width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+#note-input-title { font-family: var(--sans); font-size: 1.1rem; font-weight: 700; border-radius: 10px; padding: 12px 14px; }
+#note-input-desc { font-family: var(--mono); font-size: 0.9rem; border-radius: 10px; padding: 12px 14px; min-height: 200px; resize: vertical; line-height: 1.6; }
+
+/* Empty states */
+.notes-empty { text-align: center; padding: 50px 20px; color: var(--mid); font-size: 0.85rem; font-family: var(--mono); }
+.notes-empty span { font-size: 2.5rem; display: block; margin-bottom: 10px; opacity: 0.5; }
+
+@media (max-width: 600px) {
+  .notes-folders-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── End Notes Module ── */
+
 @media (max-width: 600px) {
   .gallery-grid { grid-template-columns: 1fr; gap: 10px; padding: 10px; }
   .qr-card { display: flex; flex-direction: row; align-items: center; text-align: left; padding: 12px 14px; gap: 16px; }
@@ -204,6 +252,7 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
   <nav>
     <button class="tab active" onclick="switchView('create', this)">Créer</button>
     <button class="tab" onclick="switchView('gallery', this)">Galerie <span class="badge" id="b-total">0</span></button>
+    <button class="tab" onclick="switchView('notes', this)">Notes <span class="badge" id="b-notes">0</span></button>
   </nav>
 </header>
 
@@ -333,6 +382,52 @@ body.mode-edit .drag-hint.visible { opacity: 1; max-height: 30px; }
 </div>
 
 <div id="toast" class="toast"></div>
+
+<!-- ── NOTES VIEW ── -->
+<main id="view-notes" class="view">
+  <div class="notes-wrap">
+    <!-- Toolbar racine -->
+    <div id="notes-root-toolbar">
+      <div class="notes-toolbar">
+        <input class="notes-search" type="text" id="notes-search" placeholder="🔍 Rechercher une note…" oninput="renderNotes()">
+        <button class="filter-btn" onclick="createNoteFolder()">📁 + Dossier</button>
+        <button class="filter-btn edit-toggle-btn" id="notes-edit-toggle" onclick="toggleNotesEditMode()">Modifier</button>
+      </div>
+    </div>
+
+    <!-- Breadcrumb (visible quand dans un dossier) -->
+    <div class="notes-path-bar" id="notes-path-bar" style="display:none;">
+      <button class="btn-back" onclick="exitNoteFolder()">← Retour</button>
+      <span id="notes-path-name" style="font-weight:bold; color:var(--ink);">Dossier</span>
+      <span style="flex:1"></span>
+      <button class="filter-btn" style="padding:6px 10px; font-size:0.7rem;" onclick="createNote()">+ Note</button>
+    </div>
+
+    <!-- Grille des dossiers OU liste des notes -->
+    <div id="notes-display"></div>
+  </div>
+</main>
+
+<!-- ── NOTE EDITOR OVERLAY ── -->
+<div id="note-modal">
+  <div class="note-modal-inner">
+    <div class="note-modal-header">
+      <span class="note-modal-title" id="note-modal-label">Nouvelle note</span>
+      <button class="btn-close-note" onclick="closeNoteModal()">✕</button>
+    </div>
+    <div class="field-group">
+      <label>Titre</label>
+      <input type="text" id="note-input-title" placeholder="Ex: Identifiants PMU…">
+    </div>
+    <div class="field-group">
+      <label>Contenu / Description</label>
+      <textarea id="note-input-desc" placeholder="Écris tes notes ici…"></textarea>
+    </div>
+    <button class="btn-main" onclick="saveNoteFromModal()">
+      <span>💾 Enregistrer</span>
+    </button>
+  </div>
+</div>
 
 <script>
 // ─── État global ────────────────────────────────────────────────────────────
@@ -570,6 +665,10 @@ function switchView(v, btn) {
   if (v === 'gallery') {
     exitFolder();
     updateFolderSelects();
+  }
+  if (v === 'notes') {
+    exitNoteFolder();
+    renderNotes();
   }
 }
 
@@ -1085,8 +1184,11 @@ async function findDriveFile() {
   return d.files && d.files.length ? d.files[0].id : null;
 }
 
-async function writeToDrive(data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+// Écrit sur Drive un objet { qr: [...], notes: [...] }
+// Reste rétro-compatible : si l'ancien fichier était un tableau plat, on le traite comme qr:[...]
+async function writeToDrive(qrData, notesData) {
+  const payload = { qr: qrData, notes: notesData };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   if (!driveFileId) driveFileId = await findDriveFile();
   if (driveFileId) {
     await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method: 'PATCH', body: blob, headers: { 'Content-Type': 'application/json' } });
@@ -1109,32 +1211,57 @@ async function syncDrive() {
   setSyncUI(true);
   try {
     if (!driveFileId) driveFileId = await findDriveFile();
-    let driveItems = [];
+
+    // Lecture Drive — rétro-compat : ancien format = tableau plat de QR
+    let driveQr = [], driveNotes = [];
     if (driveFileId) {
       const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-      const data = await r.json(); driveItems = Array.isArray(data) ? data : [];
+      const raw = await r.json();
+      if (Array.isArray(raw)) {
+        driveQr = raw; // ancien format
+      } else {
+        driveQr    = Array.isArray(raw.qr)    ? raw.qr    : [];
+        driveNotes = Array.isArray(raw.notes) ? raw.notes : [];
+      }
     }
-    const localIds = new Set(items.map(i => i.id));
-    const driveIds = new Set(driveItems.map(i => i.id));
-    const onlyOnDrive = driveItems.filter(i => !localIds.has(i.id));
-    const onlyOnLocal = items.filter(i => !driveIds.has(i.id));
-    
-    onlyOnDrive.forEach(i => {
-      if(i.type === undefined) i.type = 'qr';
-      if(i.folderId === undefined) i.folderId = null;
-    });
 
-    const merged = [...items, ...onlyOnDrive];
+    // ── Merge QR ──
+    const localQrIds  = new Set(items.map(i => i.id));
+    const driveQrIds  = new Set(driveQr.map(i => i.id));
+    const onlyOnDriveQr    = driveQr.filter(i => !localQrIds.has(i.id));
+    const onlyOnLocalQr    = items.filter(i => !driveQrIds.has(i.id));
+    onlyOnDriveQr.forEach(i => {
+      if (i.type === undefined) i.type = 'qr';
+      if (i.folderId === undefined) i.folderId = null;
+    });
+    const mergedQr = [...items, ...onlyOnDriveQr];
+
+    // ── Merge Notes ──
+    const localNoteIds = new Set(noteItems.map(n => n.id));
+    const driveNoteIds = new Set(driveNotes.map(n => n.id));
+    const onlyOnDriveNotes = driveNotes.filter(n => !localNoteIds.has(n.id));
+    const onlyOnLocalNotes = noteItems.filter(n => !driveNoteIds.has(n.id));
+    const mergedNotes = [...noteItems, ...onlyOnDriveNotes];
+
+    // ── Message résumé ──
+    const totalNewFromDrive = onlyOnDriveQr.length + onlyOnDriveNotes.length;
+    const totalNewToSend    = onlyOnLocalQr.length  + onlyOnLocalNotes.length;
     let msg = '';
-    if (onlyOnDrive.length === 0 && onlyOnLocal.length === 0) { msg = '✓ Déjà synchronisé'; }
-    else {
+    if (totalNewFromDrive === 0 && totalNewToSend === 0) {
+      msg = '✓ Déjà synchronisé';
+    } else {
       const parts = [];
-      if (onlyOnDrive.length) parts.push(`+${onlyOnDrive.length} depuis Drive`);
-      if (onlyOnLocal.length) parts.push(`+${onlyOnLocal.length} vers Drive`);
+      if (totalNewFromDrive) parts.push(`+${totalNewFromDrive} depuis Drive`);
+      if (totalNewToSend)    parts.push(`+${totalNewToSend} vers Drive`);
       msg = '✓ ' + parts.join(' · ');
     }
-    items = merged; saveItems(); updateCount(); render();
-    await writeToDrive(merged); showToast(msg);
+
+    items = mergedQr;         saveItems();
+    noteItems = mergedNotes;  saveNotes();
+    updateCount(); render(); renderNotes();
+
+    await writeToDrive(mergedQr, mergedNotes);
+    showToast(msg);
   } catch(e) { showToast('Erreur sync : ' + e.message); }
   setSyncUI(false);
 }
@@ -1218,12 +1345,12 @@ async function confirmDelete(optionPlus) {
         if (!driveFileId) driveFileId = await findDriveFile();
         if (driveFileId) {
           const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-          let driveItems = await r.json();
-          if (Array.isArray(driveItems)) {
-            const removedId = items[idx].id;
-            driveItems = driveItems.filter(i => i.id !== removedId);
-            await writeToDrive(driveItems);
-          }
+          const raw = await r.json();
+          const removedId = items[idx].id;
+          // Rétro-compat : ancien format tableau plat
+          const driveQr    = Array.isArray(raw) ? raw.filter(i => i.id !== removedId) : (Array.isArray(raw.qr) ? raw.qr.filter(i => i.id !== removedId) : []);
+          const driveNotes = Array.isArray(raw.notes) ? raw.notes : [];
+          await writeToDrive(driveQr, driveNotes);
         }
         showToast('✓ Supprimé localement et sur Drive');
       } catch(e) { showToast('Supprimé localement — erreur Drive : ' + e.message); }
@@ -1243,8 +1370,231 @@ function showToast(m) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// ─── Notes Module ────────────────────────────────────────────────────────────
+let noteItems = JSON.parse(localStorage.getItem('qr_notes_v1') || '[]');
+let currentNoteFolderId = null;
+let isNotesEditMode = false;
+let editingNoteId = null; // null = nouvelle note
+
+function saveNotes() {
+  try { localStorage.setItem('qr_notes_v1', JSON.stringify(noteItems)); }
+  catch(e) { showToast('⚠ Stockage insuffisant'); }
+  updateNotesCount();
+}
+
+function updateNotesCount() {
+  const count = noteItems.filter(n => n.type === 'note').length;
+  const badge = document.getElementById('b-notes');
+  if (badge) badge.innerText = count;
+}
+
+function toggleNotesEditMode() {
+  isNotesEditMode = !isNotesEditMode;
+  const btn = document.getElementById('notes-edit-toggle');
+  if (isNotesEditMode) {
+    document.body.classList.add('mode-notes-edit');
+    btn.textContent = 'Terminé';
+    btn.classList.add('active');
+  } else {
+    document.body.classList.remove('mode-notes-edit');
+    btn.textContent = 'Modifier';
+    btn.classList.remove('active');
+  }
+  renderNotes();
+}
+
+function createNoteFolder() {
+  const name = prompt("Nom du dossier client :");
+  if (!name || !name.trim()) return;
+  noteItems.push({ id: Date.now(), type: 'note-folder', title: name.trim() });
+  saveNotes();
+  renderNotes();
+}
+
+function enterNoteFolder(id, name) {
+  if (isNotesEditMode) return;
+  currentNoteFolderId = id;
+  document.getElementById('notes-path-bar').style.display = 'flex';
+  document.getElementById('notes-path-name').textContent = `📁 ${name}`;
+  document.getElementById('notes-root-toolbar').style.display = 'none';
+  renderNotes();
+}
+
+function exitNoteFolder() {
+  currentNoteFolderId = null;
+  document.getElementById('notes-path-bar').style.display = 'none';
+  document.getElementById('notes-root-toolbar').style.display = 'block';
+  renderNotes();
+}
+
+function createNote() {
+  if (currentNoteFolderId === null) return showToast('Entre dans un dossier pour créer une note');
+  editingNoteId = null;
+  document.getElementById('note-modal-label').textContent = 'Nouvelle note';
+  document.getElementById('note-input-title').value = '';
+  document.getElementById('note-input-desc').value = '';
+  document.getElementById('note-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('note-input-title').focus(), 100);
+}
+
+function openNoteEdit(id) {
+  const note = noteItems.find(n => n.id === id);
+  if (!note) return;
+  editingNoteId = id;
+  document.getElementById('note-modal-label').textContent = 'Modifier la note';
+  document.getElementById('note-input-title').value = note.title;
+  document.getElementById('note-input-desc').value = note.desc || '';
+  document.getElementById('note-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('note-input-title').focus(), 100);
+}
+
+function closeNoteModal() {
+  document.getElementById('note-modal').style.display = 'none';
+  editingNoteId = null;
+}
+
+function saveNoteFromModal() {
+  const title = document.getElementById('note-input-title').value.trim();
+  const desc = document.getElementById('note-input-desc').value.trim();
+  if (!title) return showToast('Ajoute un titre');
+
+  if (editingNoteId !== null) {
+    const note = noteItems.find(n => n.id === editingNoteId);
+    if (note) {
+      note.title = title;
+      note.desc = desc;
+      note.updatedAt = Date.now();
+    }
+    showToast('✓ Note mise à jour');
+  } else {
+    noteItems.push({
+      id: Date.now(),
+      type: 'note',
+      folderId: currentNoteFolderId,
+      title,
+      desc,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    showToast('✓ Note créée');
+  }
+
+  saveNotes();
+  closeNoteModal();
+  renderNotes();
+}
+
+function deleteNoteItem(id) {
+  const item = noteItems.find(n => n.id === id);
+  if (!item) return;
+  if (item.type === 'note-folder') {
+    if (!confirm(`Supprimer le dossier "${item.title}" et toutes ses notes ?`)) return;
+    noteItems = noteItems.filter(n => n.id !== id && n.folderId !== id);
+  } else {
+    noteItems = noteItems.filter(n => n.id !== id);
+  }
+  saveNotes();
+  renderNotes();
+  showToast('✓ Supprimé');
+}
+
+function formatNoteDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderNotes() {
+  const display = document.getElementById('notes-display');
+  if (!display) return;
+
+  const query = (document.getElementById('notes-search')?.value || '').toLowerCase().trim();
+
+  // Search mode: show all matching notes across folders
+  if (query) {
+    const matches = noteItems.filter(n => n.type === 'note' && n.title.toLowerCase().includes(query));
+    if (!matches.length) {
+      display.innerHTML = `<div class="notes-empty"><span>🔍</span>Aucune note trouvée</div>`;
+      return;
+    }
+    display.innerHTML = '';
+    const list = document.createElement('div');
+    list.className = 'notes-list';
+    matches.forEach(note => list.appendChild(buildNoteCard(note)));
+    display.appendChild(list);
+    return;
+  }
+
+  if (currentNoteFolderId === null) {
+    // Root: show folders
+    const folders = noteItems.filter(n => n.type === 'note-folder');
+    if (!folders.length) {
+      display.innerHTML = `<div class="notes-empty"><span>📁</span>Aucun dossier client.<br>Clique sur "+ Dossier" pour commencer.</div>`;
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'notes-folders-grid';
+    folders.forEach(folder => {
+      const count = noteItems.filter(n => n.type === 'note' && n.folderId === folder.id).length;
+      const card = document.createElement('div');
+      card.className = 'notes-folder-card';
+      card.innerHTML = `
+        <button class="del-btn" title="Supprimer">✕</button>
+        <div class="folder-icon">📁</div>
+        <div class="folder-name">${escapeHtml(folder.title)}</div>
+        <div class="folder-meta">${count} note${count > 1 ? 's' : ''}</div>
+      `;
+      card.querySelector('.del-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteNoteItem(folder.id);
+      });
+      card.addEventListener('click', () => enterNoteFolder(folder.id, folder.title));
+      grid.appendChild(card);
+    });
+    display.innerHTML = '';
+    display.appendChild(grid);
+  } else {
+    // Inside a folder: show notes
+    const notes = noteItems.filter(n => n.type === 'note' && n.folderId === currentNoteFolderId);
+    if (!notes.length) {
+      display.innerHTML = `<div class="notes-empty"><span>📝</span>Aucune note.<br>Clique sur "+ Note" pour en créer une.</div>`;
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'notes-list';
+    notes.forEach(note => list.appendChild(buildNoteCard(note)));
+    display.innerHTML = '';
+    display.appendChild(list);
+  }
+}
+
+function buildNoteCard(note) {
+  const card = document.createElement('div');
+  card.className = 'note-card';
+  card.innerHTML = `
+    <button class="del-btn" title="Supprimer">✕</button>
+    <div class="note-title">${escapeHtml(note.title)}</div>
+    <div class="note-desc">${escapeHtml(note.desc || '')}</div>
+    <div class="note-date">${formatNoteDate(note.updatedAt || note.createdAt)}</div>
+  `;
+  card.querySelector('.del-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    deleteNoteItem(note.id);
+  });
+  card.addEventListener('click', () => {
+    if (!isNotesEditMode) openNoteEdit(note.id);
+  });
+  return card;
+}
+
+// Patch switchView to trigger notes render
+const _origSwitchView = switchView;
+// ─── End Notes Module ─────────────────────────────────────────────────────────
+
 // Lancement global
 updateCount();
+updateNotesCount();
 updateFolderSelects();
 </script>
 
